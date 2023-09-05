@@ -206,5 +206,5 @@ INITIAL_CONDITIONS_CONTAIN_ENTROPY
 #STOP_AFTER_STEP=10                           # ends a simulation after the specified timestep (to simplify scalability tests)
 #TREE_NO_SAFETY_BOX                           # when set, this disables the geometric 'near node' protection
 
-#---------------------------------------- Galotfa options
+#---------------------------------------- User defined on-the-fly analysis options
 #ZERO_MASS_GRA_TEST # whether use zero-mass test particles for potential calculations

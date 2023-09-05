@@ -110,6 +110,10 @@ inline void gwalk::evaluate_particle_particle_interaction(const pinfo &pdat, con
       overlap_check = foreignpoint->InsideOutsideFlag;
 #endif
     }
+#ifdef ZERO_MASS_GRA_TEST
+  if(mass == 0)
+    return;  // TEST: no need for potential calculation for zero mass particles
+#endif
 
 #ifdef PMGRID
   mesh_factors *mfp = &mf[LOW_MESH];
@@ -144,8 +148,9 @@ inline void gwalk::evaluate_particle_particle_interaction(const pinfo &pdat, con
 #ifdef EVALPOTENTIAL
   *pdat.pot -= mass * gfac.fac0;
 #endif
-#ifdef ZERO_MASS_GRA_TEST  // TEST: zero mass particle potential calculation
-  if(pdat.Type == 3)
+#ifdef ZERO_MASS_GRA_TEST
+  // TEST: zero mass particle potential calculation
+  if(pdat.Type == All.ZeroMassPartType)
     *pdat.acc -= 0 * dxyz;
   else
     *pdat.acc -= (mass * gfac.fac1 * rinv) * dxyz;
@@ -163,8 +168,9 @@ inline void gwalk::evaluate_particle_particle_interaction(const pinfo &pdat, con
 #ifdef EVALPOTENTIAL
       *pdat.pot += mass * ew.D0phi;
 #endif
-#ifdef ZERO_MASS_GRA_TEST  // TEST: zero mass particle potential calculation
-      if(pdat.Type == 3)
+#ifdef ZERO_MASS_GRA_TEST
+      // TEST: zero mass particle potential calculation
+      if(pdat.Type == All.ZeroMassPartType)
         *pdat.acc += 0 * ew.D1phi;
       else
         *pdat.acc += mass * ew.D1phi;
@@ -319,8 +325,9 @@ inline int gwalk::evaluate_particle_node_opening_criterion_and_interaction(const
 #endif
 
   MyReal g1 = gfac.fac1 * rinv;
-#ifdef ZERO_MASS_GRA_TEST  // TEST: zero mass particle potential calculation
-  if(pdat.Type == 3)
+#ifdef ZERO_MASS_GRA_TEST
+  // TEST: zero mass particle potential calculation
+  if(pdat.Type == All.ZeroMassPartType)
     *pdat.acc -= 0 * dxyz;
   else
     *pdat.acc -= (mass * g1) * dxyz;  //              monopole force
@@ -434,8 +441,9 @@ inline int gwalk::evaluate_particle_node_opening_criterion_and_interaction(const
       *pdat.pot += static_cast<MyReal>(1.0 / 120) * (nop->Q5Tensor * ew.D5phi);
 #endif
 #endif
-#ifdef ZERO_MASS_GRA_TEST  // TEST: zero mass particle potential calculation
-      if(pdat.Type == 3)
+#ifdef ZERO_MASS_GRA_TEST
+      // TEST: zero mass particle potential calculation
+      if(pdat.Type == All.ZeroMassPartType)
         *pdat.acc -= 0 * ew.D1phi;
       else
         *pdat.acc += mass * ew.D1phi;

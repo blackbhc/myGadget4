@@ -1251,7 +1251,7 @@ halos that is added as a static potential to the force computation.
 
 -------
 
-**ZeroMassPartType**   3 
+**ZeroMassPartType**    3
 
 This parameter specify the particle type that is zero mass, which 
 is used to calculate the gravitational potential at the position of 
