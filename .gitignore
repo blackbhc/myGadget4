@@ -1,0 +1,9 @@
+param.txt
+*-usedvalues
+output
+Gadget4
+*.o
+version.cc
+Config.sh
+Makefile.systype
+build/*
