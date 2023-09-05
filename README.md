@@ -1,4 +1,6 @@
-
+This is a fork of GADGET-4
+==========================
+The original GADGET-4 code is available at https://wwwmpa.mpa-garching.mpg.de/gadget4. This fork is intended to be a place to store my modifications to the code. The main changes are:
 
 GADGET-4
 ========
