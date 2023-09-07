@@ -213,10 +213,191 @@ void sim::run(void)
 
       All.NumCurrentTiStep++;
 
+      // Data collection part, which will be used in galotfa
+      // array of the particles' data
+#ifdef ZERO_MASS_GRA_TEST
+      // recenter the zero-mass static test particles to the center of mass of the system
+      double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
+      double pos[3];
+      double offset = 0.0;  // offset for the positions w.r.t. the center of mass
+
+      // initialize the center of mass
+      double localSumPos[3] = {0.0, 0.0, 0.0};  // local sum of positions
+      double localSumMass   = 0.0;              // local sum of Mass
+      for(int i = 0; i < Sp.NumPart; i++)
+        {
+          if(Sp.P[i].getType() != All.RecenterPartType)
+            continue;  // only calculate the center of mass for the particles of the specified type
+          else
+            {
+              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);
+              // only consider the particles within the central box
+              if(abs(pos[0]) > All.RecenterSize * 100 && abs(pos[1]) > All.RecenterSize * 100 && abs(pos[2]) > All.RecenterSize * 100)
+                continue;
+              localSumPos[0] += pos[0] * Sp.P[i].getMass();
+              localSumPos[1] += pos[1] * Sp.P[i].getMass();
+              localSumPos[2] += pos[2] * Sp.P[i].getMass();
+              localSumMass += Sp.P[i].getMass();
+            }
+        }
+      // MPI reduction to get the demoninator and numerator of the center of mass
+      MPI_Allreduce(MPI_IN_PLACE, localSumPos, 3, MPI_DOUBLE, MPI_SUM, Communicator);
+      MPI_Allreduce(MPI_IN_PLACE, &localSumMass, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+      // update the center of mass
+      centerOfMass[0] = localSumPos[0] / localSumMass;
+      centerOfMass[1] = localSumPos[1] / localSumMass;
+      centerOfMass[2] = localSumPos[2] / localSumMass;
+
+      // the main loop of the recentering
+      for(int loop = 0; loop < 25; loop++)  // MAX number of iterations = 25
+        {
+          double oldValue[3]    = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
+          double localSumPos[3] = {0.0, 0.0, 0.0};                                      // local sum of positions
+          double localSumMass   = 0.0;                                                  // local sum of Mass
+          for(int i = 0; i < Sp.NumPart; i++)
+            {
+              if(Sp.P[i].getType() != All.RecenterPartType)
+                continue;  // only calculate the center of mass for the particles of the specified type
+              else
+                {
+                  Sp.intpos_to_pos(Sp.P[i].IntPos, pos);
+                  offset = sqrt((pos[0] - centerOfMass[0]) * (pos[0] - centerOfMass[0]) +
+                                (pos[1] - centerOfMass[1]) * (pos[1] - centerOfMass[1]) +
+                                (pos[2] - centerOfMass[2]) * (pos[2] - centerOfMass[2]));
+                  if(offset < All.RecenterSize)  // only consider the particles within the specified radius
+                    {
+                      localSumPos[0] += pos[0] * Sp.P[i].getMass();
+                      localSumPos[1] += pos[1] * Sp.P[i].getMass();
+                      localSumPos[2] += pos[2] * Sp.P[i].getMass();
+                      localSumMass += Sp.P[i].getMass();
+                    }
+                }
+            }
+          // MPI reduction to get the demoninator and numerator of the center of mass
+          MPI_Allreduce(MPI_IN_PLACE, localSumPos, 3, MPI_DOUBLE, MPI_SUM, Communicator);
+          MPI_Allreduce(MPI_IN_PLACE, &localSumMass, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+          // update the center of mass
+          centerOfMass[0] = localSumPos[0] / localSumMass;
+          centerOfMass[1] = localSumPos[1] / localSumMass;
+          centerOfMass[2] = localSumPos[2] / localSumMass;
+          // check whether the center of mass has converged
+          if((centerOfMass[0] - oldValue[0]) * (centerOfMass[0] - oldValue[0]) +
+                 (centerOfMass[1] - oldValue[1]) * (centerOfMass[1] - oldValue[1]) +
+                 (centerOfMass[2] - oldValue[2]) * (centerOfMass[2] - oldValue[2]) <
+             All.RecenterThreshold)
+            break;
+        }
+      // shift the zero-mass static test particles w.r.t the center of mass
+      for(int i = 0; i < Sp.NumPart; i++)
+        {
+          if(Sp.P[i].getType() != All.ZeroMassPartType)
+            continue;  // only calculate the center of mass for the particles of the specified type
+          else
+            {
+              MyIntPosType intpos[3];
+              Sp.pos_to_intpos(centerOfMass, intpos);
+              Sp.P[i].IntPos[0] += intpos[0];
+              Sp.P[i].IntPos[1] += intpos[1];
+              Sp.P[i].IntPos[2] += intpos[2];
+            }
+        }
+#endif
+
       /* Check whether we should write a restart file */
+
       if(check_for_interruption_of_run())
         return;
     }
+#ifdef ZERO_MASS_GRA_TEST
+  // recenter the zero-mass static test particles to the center of mass of the system
+  double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
+  double pos[3];
+  double offset = 0.0;  // offset for the positions w.r.t. the center of mass
+
+  // initialize the center of mass
+  double localSumPos[3] = {0.0, 0.0, 0.0};  // local sum of positions
+  double localSumMass   = 0.0;              // local sum of Mass
+  for(int i = 0; i < Sp.NumPart; i++)
+    {
+      if(Sp.P[i].getType() != All.RecenterPartType)
+        continue;  // only calculate the center of mass for the particles of the specified type
+      else
+        {
+          Sp.intpos_to_pos(Sp.P[i].IntPos, pos);
+          // only consider the particles within the central box
+          if(abs(pos[0]) > All.RecenterSize * 100 && abs(pos[1]) > All.RecenterSize * 100 && abs(pos[2]) > All.RecenterSize * 100)
+            continue;
+          localSumPos[0] += pos[0] * Sp.P[i].getMass();
+          localSumPos[1] += pos[1] * Sp.P[i].getMass();
+          localSumPos[2] += pos[2] * Sp.P[i].getMass();
+          localSumMass += Sp.P[i].getMass();
+        }
+    }
+  // MPI reduction to get the demoninator and numerator of the center of mass
+  MPI_Allreduce(MPI_IN_PLACE, localSumPos, 3, MPI_DOUBLE, MPI_SUM, Communicator);
+  MPI_Allreduce(MPI_IN_PLACE, &localSumMass, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+  // update the center of mass
+  centerOfMass[0] = localSumPos[0] / localSumMass;
+  centerOfMass[1] = localSumPos[1] / localSumMass;
+  centerOfMass[2] = localSumPos[2] / localSumMass;
+
+  // the main loop of the recentering
+  double oldValue[3] = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
+  for(int loop = 0; loop < 25; loop++)                                       // MAX number of iterations = 25
+    {
+      oldValue[0]           = centerOfMass[0];
+      oldValue[1]           = centerOfMass[1];
+      oldValue[2]           = centerOfMass[2];
+      double localSumPos[3] = {0.0, 0.0, 0.0};  // local sum of positions
+      double localSumMass   = 0.0;              // local sum of Mass
+      for(int i = 0; i < Sp.NumPart; i++)
+        {
+          if(Sp.P[i].getType() != All.RecenterPartType)
+            continue;  // only calculate the center of mass for the particles of the specified type
+          else
+            {
+              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);
+              offset = sqrt((pos[0] - centerOfMass[0]) * (pos[0] - centerOfMass[0]) +
+                            (pos[1] - centerOfMass[1]) * (pos[1] - centerOfMass[1]) +
+                            (pos[2] - centerOfMass[2]) * (pos[2] - centerOfMass[2]));
+              if(offset < All.RecenterSize)  // only consider the particles within the specified radius
+                {
+                  localSumPos[0] += pos[0] * Sp.P[i].getMass();
+                  localSumPos[1] += pos[1] * Sp.P[i].getMass();
+                  localSumPos[2] += pos[2] * Sp.P[i].getMass();
+                  localSumMass += Sp.P[i].getMass();
+                }
+            }
+        }
+      // MPI reduction to get the demoninator and numerator of the center of mass
+      MPI_Allreduce(MPI_IN_PLACE, localSumPos, 3, MPI_DOUBLE, MPI_SUM, Communicator);
+      MPI_Allreduce(MPI_IN_PLACE, &localSumMass, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+      // update the center of mass
+      centerOfMass[0] = localSumPos[0] / localSumMass;
+      centerOfMass[1] = localSumPos[1] / localSumMass;
+      centerOfMass[2] = localSumPos[2] / localSumMass;
+      // check whether the center of mass has converged
+      if((centerOfMass[0] - oldValue[0]) * (centerOfMass[0] - oldValue[0]) +
+             (centerOfMass[1] - oldValue[1]) * (centerOfMass[1] - oldValue[1]) +
+             (centerOfMass[2] - oldValue[2]) * (centerOfMass[2] - oldValue[2]) <
+         All.RecenterThreshold)
+        break;
+    }
+  // shift the zero-mass static test particles w.r.t the center of mass
+  for(int i = 0; i < Sp.NumPart; i++)
+    {
+      if(Sp.P[i].getType() != All.ZeroMassPartType)
+        continue;  // only calculate the center of mass for the particles of the specified type
+      else
+        {
+          MyIntPosType intpos[3];
+          Sp.pos_to_intpos(centerOfMass, intpos);
+          Sp.P[i].IntPos[0] += intpos[0];
+          Sp.P[i].IntPos[1] += intpos[1];
+          Sp.P[i].IntPos[2] += intpos[2];
+        }
+    }
+#endif
 
   restart Restart{Communicator};
   Restart.write(this); /* write a restart file at final time - can be used to continue simulation beyond final time */
@@ -704,10 +885,8 @@ void sim::create_snapshot_if_desired(void)
             mycxxsort_parallel(Lp.P, Lp.P + Lp.NumPart, Lp.compare_ipnest, Communicator);
 #endif
 
-#if !defined(LIGHTCONE_PARTICLES_SKIP_SAVING)
             for(int conenr = 0; conenr < LightCone.Nlightcones; conenr++)
               Lcone.lightcone_save(All.LightconeFileCount, conenr, false);
-#endif
 
             mpi_printf("LIGHTCONE: done with writing files.\n");
 

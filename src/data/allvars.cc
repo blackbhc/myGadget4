@@ -19,6 +19,7 @@
 #include "../data/dtypes.h"
 #include "../data/macros.h"
 #include "../time_integration/driftfac.h"
+#include "io/parameters.h"
 
 void global_data_all_processes::set_cosmo_factors_for_current_time(void)
 {
@@ -59,6 +60,11 @@ void global_data_all_processes::register_parameters(void)
 {
 #ifdef ZERO_MASS_GRA_TEST
   add_param("ZeroMassPartType", &ZeroMassPartType, PARAM_INT, PARAM_CHANGEABLE);  // TEST: add a parameter for zero mass test particles
+  add_param("RecenterPartType", &RecenterPartType, PARAM_INT, PARAM_CHANGEABLE);  // particle type to recenter particles
+  add_param("RecenterSize", &RecenterSize, PARAM_DOUBLE,
+            PARAM_CHANGEABLE);  // radius of the sphere to recenter particles
+  add_param("RecenterThreshold", &RecenterThreshold, PARAM_DOUBLE,
+            PARAM_CHANGEABLE);  // convergence threshold for recentering
 #endif
   add_param("InitCondFile", InitCondFile, PARAM_STRING, PARAM_FIXED);
 
