@@ -1652,3 +1652,9 @@ interact.
 
 Whether used zero mass static particles to calculate the gravitational 
 potential for on-the-fly analysis.
+
+-------
+
+**UPDATE_CENTER**
+
+Whether to update the center of the zero mass static test particles.
