@@ -278,8 +278,8 @@ void sim::run(void)
                 }
             }
           // MPI reduction to get the demoninator and numerator of the center of mass
-          // MPI_Allreduce(MPI_IN_PLACE, localSumPos, 3, MPI_DOUBLE, MPI_SUM, Communicator);
-          // MPI_Allreduce(MPI_IN_PLACE, &localSumMass, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+          MPI_Allreduce(MPI_IN_PLACE, localSumPos, 3, MPI_DOUBLE, MPI_SUM, Communicator);
+          MPI_Allreduce(MPI_IN_PLACE, &localSumMass, 1, MPI_DOUBLE, MPI_SUM, Communicator);
           // update the center of mass
           centerOfMass[0] = localSumPos[0] / localSumMass;
           centerOfMass[1] = localSumPos[1] / localSumMass;
@@ -292,10 +292,10 @@ void sim::run(void)
             break;
         }
       // shift the zero-mass static test particles w.r.t the center of mass
-      static MyIntPosType intpos[3];
+      static MyIntPosType intpos[3] = {0, 0, 0};
+      // Sp.pos_to_intpos(centerOfMass, intpos); //TODO: the most computationally expensive part
       for(int i = 0; i < numZeroMass; ++i)
         {
-          Sp.pos_to_intpos(centerOfMass, intpos);
           Sp.P[idZeroMass[i]].IntPos[0] += intpos[0];
           Sp.P[idZeroMass[i]].IntPos[1] += intpos[1];
           Sp.P[idZeroMass[i]].IntPos[2] += intpos[2];
