@@ -226,10 +226,8 @@ void sim::run(void)
       int idZeroMass[Sp.NumPart];  // id of zero-mass static test particles in local process
 
       // TODO: output the positions and potentials of the zero-mass static test particles
-#ifdef UPDATE_CENTER
       int numRecenter = 0;         // number of target recentering particles in local process
       int idRecenter[Sp.NumPart];  // id of target recentering particles in local process
-#endif
       for(int i = 0; i < Sp.NumPart; ++i)
         {
           if(Sp.P[i].getType() == All.ZeroMassPartType)
@@ -241,12 +239,9 @@ void sim::run(void)
               potentials[numZeroMass]   = Sp.P[i].Potential;
               idZeroMass[numZeroMass++] = i;
             }
-#ifdef UPDATE_CENTER
           else if(Sp.P[i].getType() == All.RecenterPartType)
             idRecenter[numRecenter++] = i;
-#endif
         }
-#ifdef UPDATE_CENTER
       // recenter the zero-mass static test particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
       static double lastCenterOfMass[3];                // center of mass in the last step
@@ -307,7 +302,6 @@ void sim::run(void)
           Sp.P[idZeroMass[i]].IntPos[1] += intpos[1];
           Sp.P[idZeroMass[i]].IntPos[2] += intpos[2];
         }  // update the center of mass for zero-mass static test particles
-#endif
 #endif
 
       /* Check whether we should write a restart file */
