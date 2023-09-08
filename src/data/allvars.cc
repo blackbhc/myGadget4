@@ -63,6 +63,8 @@ void global_data_all_processes::register_parameters(void)
   add_param("RecenterPartType", &RecenterPartType, PARAM_INT, PARAM_CHANGEABLE);  // particle type to recenter particles
   add_param("PotOutStep", &PotOutStep, PARAM_INT,
             PARAM_CHANGEABLE);  // output potentials of zero-mass static test particles every PotOutStep steps
+  add_param("PotOutFile", PotOutFile, PARAM_STRING,
+            PARAM_CHANGEABLE);  // output file for potentials of zero-mass static test particles
   add_param("RecenterSize", &RecenterSize, PARAM_DOUBLE,
             PARAM_CHANGEABLE);  // radius of the sphere to recenter particles
   add_param("RecenterThreshold", &RecenterThreshold, PARAM_DOUBLE,

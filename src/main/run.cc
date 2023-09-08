@@ -38,6 +38,10 @@
 #include "../sort/parallel_sort.h"
 #include "../system/system.h"
 
+void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], MyIDType (&ids)[], double time,
+                             int num);
+void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], MyIDType (&localIDds)[], double (&globalPot)[],
+                               double (&globalPos)[][3], MyIDType (&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size);
 /*!
  * Main driver routine for advancing the simulation forward in time.
  * The loop terminates when the cpu-time limit is reached, when a `stop' file
@@ -220,28 +224,43 @@ void sim::run(void)
       static double pos[3] = {0, 0, 0};
       // Data collection part, which will be used in galotfa
       // array of the particles' data
-      double positions[Sp.NumPart][3];
-      double potentials[Sp.NumPart];
-      int numZeroMass = 0;         // number of zero-mass static test particles in local process
+      double positions[Sp.NumPart][3];  // positions
+      double potentials[Sp.NumPart];    // potentials
+      MyIDType partIDs[Sp.NumPart];     // particle IDs
+      double posGlobal[Sp.TotNumPart][3];
+      double potGlobal[Sp.TotNumPart];
+      MyIDType pIDsGlobal[Sp.TotNumPart];
+      // global arrays of the particles' data
+      int numZeroMass    = 0;      // number of zero-mass static test particles in local process
+      int numZeroMassTot = 0;      // number of zero-mass static test particles in global process
       int idZeroMass[Sp.NumPart];  // id of zero-mass static test particles in local process
-
-      // TODO: output the positions and potentials of the zero-mass static test particles
       int numRecenter = 0;         // number of target recentering particles in local process
       int idRecenter[Sp.NumPart];  // id of target recentering particles in local process
       for(int i = 0; i < Sp.NumPart; ++i)
         {
           if(Sp.P[i].getType() == All.ZeroMassPartType)
             {
-              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);  // collect positions
-              positions[numZeroMass][0] = pos[0];
-              positions[numZeroMass][1] = pos[1];
-              positions[numZeroMass][2] = pos[2];
-              potentials[numZeroMass]   = Sp.P[i].Potential;
+              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);          // collect positions
+              if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials at the specified output steps
+                {
+                  positions[numZeroMass][0] = pos[0];
+                  positions[numZeroMass][1] = pos[1];
+                  positions[numZeroMass][2] = pos[2];
+                  potentials[numZeroMass]   = Sp.P[i].Potential;
+                  partIDs[numZeroMass]      = Sp.P[i].ID.get();
+                }
               idZeroMass[numZeroMass++] = i;
             }
           else if(Sp.P[i].getType() == All.RecenterPartType)
             idRecenter[numRecenter++] = i;
         }
+      // TODO: output the positions and potentials of the zero-mass static test particles
+      collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numZeroMass, numZeroMassTot,
+                                ThisTask, NTask);
+      if(All.NumCurrentTiStep % All.PotOutStep == 0)
+        if(ThisTask == 0)
+          write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numZeroMassTot);
+
       // recenter the zero-mass static test particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
       static double lastCenterOfMass[3];                // center of mass in the last step
@@ -849,4 +868,59 @@ void sim::create_snapshot_if_desired(void)
         Lp.reallocate_memory_maxpart(LIGHTCONE_ALLOC_FAC * Sp.MaxPart);
     }
 #endif
+}
+
+// My functions: Bin-Hui Chen
+void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], MyIDType (&ids)[], double time,
+                             int num)
+{
+  char potFile[MAXLEN_PATH_EXTRA];
+  snprintf(potFile, MAXLEN_PATH_EXTRA, "%s%s.hdf5", All.OutputDir, filename);
+  printf("Writing potential tracers to file %s.\n", potFile);
+}
+
+void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], MyIDType (&localIDs)[], double (&globalPot)[],
+                               double (&globalPos)[][3], MyIDType (&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size)
+{
+  if(size > 1)  // if there are more than one MPI tasks
+    {
+      static int offset = 0;
+      if(rank == 0)
+        {
+          static int dataTransferSize = 0;
+          offset                      = localNum;
+          for(int i = 1; i < size; ++i)
+            {
+              MPI_Recv(&dataTransferSize, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);  // receive the size of data to be sent
+              MPI_Recv(globalPot + offset, dataTransferSize, MPI_DOUBLE, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+              MPI_Recv(globalPos + offset, 3 * dataTransferSize, MPI_DOUBLE, i, 1e5 + i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+              MPI_Recv(globalIDs + offset, dataTransferSize, MPI_INT, i, 2e5 + i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+              offset += dataTransferSize;
+            }
+        }
+      else
+        {
+          for(int i = 1; i < size; ++i)
+            if(rank == i)
+              {
+                MPI_Send(&localNum, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);  // send the size of data to be sent
+                MPI_Send(localPot, localNum, MPI_DOUBLE, 0, i, MPI_COMM_WORLD);
+                MPI_Send(localPos, 3 * localNum, MPI_DOUBLE, 0, 1e5 + i, MPI_COMM_WORLD);
+                MPI_Send(localIDs, localNum, MPI_INT, 0, 2e5 + i, MPI_COMM_WORLD);
+              }
+        }
+      MPI_Bcast(&offset, 1, MPI_INT, 0, MPI_COMM_WORLD);  // TEST: may be unnecessary
+      globalNum = offset;
+    }
+  else  // if there is only one MPI task
+    {
+      globalNum = localNum;
+      for(int i = 0; i < localNum; ++i)
+        {
+          globalPot[i] = localPot[i];
+          globalIDs[i] = localIDs[i];
+          for(int j = 0; j < 3; ++j)
+            globalPos[i][j] = localPos[i][j];
+        }
+    }
 }
