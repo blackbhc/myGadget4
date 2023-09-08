@@ -247,22 +247,21 @@ void sim::run(void)
 #ifdef UPDATE_CENTER
       // recenter the zero-mass static test particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
-      static double offset          = 0.0;              // offset for the positions w.r.t. the center of mass
+      static double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
       // initialize the center of mass
-      double localSumPos[3] = {0.0, 0.0, 0.0};  // local sum of positions
-      double localSumMass   = 0.0;              // local sum of Mass
+      double comNumerator[3] = {0.0, 0.0, 0.0};  // local sum of positions
+      double comDenominator  = 0.0;              // local sum of Mass
       // the main loop of the recentering
       static double oldValue[3] = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
       for(int loop = 0; loop < 25; ++loop)                                              // MAX number of iterations = 25
         {
-          double factor = loop == 0 ? 100.0 : 1;  // the scale factor for region size: used to get a large enough region at the first
-                                                  // iteration
-          memset(localSumPos, 0, 3 * sizeof(double));
-          localSumMass = 0.0;
-          oldValue[0]  = centerOfMass[0];
-          oldValue[1]  = centerOfMass[1];
-          oldValue[2]  = centerOfMass[2];
-          for(int i = 0; i < numRecenter; i++)
+          double factor = loop == 0 ? 100.0 : 1;  // the scale factor for region size: set a large region for the 1st iteration
+          memset(comNumerator, 0, 3 * sizeof(double));
+          comDenominator = 0.0;
+          oldValue[0]    = centerOfMass[0];
+          oldValue[1]    = centerOfMass[1];
+          oldValue[2]    = centerOfMass[2];
+          for(int i = 0; i < numRecenter; ++i)
             {
               Sp.intpos_to_pos(Sp.P[idRecenter[i]].IntPos, pos);
               // only consider the particles within the specified radius
@@ -271,24 +270,24 @@ void sim::run(void)
                             (pos[2] - centerOfMass[2]) * (pos[2] - centerOfMass[2]));
               if(offset < All.RecenterSize * factor)  // only consider the particles within the specified radius
                 {
-                  localSumPos[0] += pos[0] * Sp.P[i].getMass();
-                  localSumPos[1] += pos[1] * Sp.P[i].getMass();
-                  localSumPos[2] += pos[2] * Sp.P[i].getMass();
-                  localSumMass += Sp.P[i].getMass();
+                  comNumerator[0] += pos[0] * Sp.P[idRecenter[i]].getMass();
+                  comNumerator[1] += pos[1] * Sp.P[idRecenter[i]].getMass();
+                  comNumerator[2] += pos[2] * Sp.P[idRecenter[i]].getMass();
+                  comDenominator += Sp.P[idRecenter[i]].getMass();
                 }
             }
           // MPI reduction to get the demoninator and numerator of the center of mass
-          MPI_Allreduce(MPI_IN_PLACE, localSumPos, 3, MPI_DOUBLE, MPI_SUM, Communicator);
-          MPI_Allreduce(MPI_IN_PLACE, &localSumMass, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+          MPI_Allreduce(MPI_IN_PLACE, comNumerator, 3, MPI_DOUBLE, MPI_SUM, Communicator);
+          MPI_Allreduce(MPI_IN_PLACE, &comDenominator, 1, MPI_DOUBLE, MPI_SUM, Communicator);
           // update the center of mass
-          centerOfMass[0] = localSumPos[0] / localSumMass;
-          centerOfMass[1] = localSumPos[1] / localSumMass;
-          centerOfMass[2] = localSumPos[2] / localSumMass;
+          centerOfMass[0] = comNumerator[0] / comDenominator;
+          centerOfMass[1] = comNumerator[1] / comDenominator;
+          centerOfMass[2] = comNumerator[2] / comDenominator;
           // check whether the center of mass has converged
           if((centerOfMass[0] - oldValue[0]) * (centerOfMass[0] - oldValue[0]) +
                  (centerOfMass[1] - oldValue[1]) * (centerOfMass[1] - oldValue[1]) +
                  (centerOfMass[2] - oldValue[2]) * (centerOfMass[2] - oldValue[2]) <
-             All.RecenterThreshold)
+             All.RecenterThreshold)  // if the center of mass has converged, break the loop
             break;
         }
       // shift the zero-mass static test particles w.r.t the center of mass
@@ -299,12 +298,11 @@ void sim::run(void)
           Sp.P[idZeroMass[i]].IntPos[0] += intpos[0];
           Sp.P[idZeroMass[i]].IntPos[1] += intpos[1];
           Sp.P[idZeroMass[i]].IntPos[2] += intpos[2];
-        }
+        }  // update the center of mass for zero-mass static test particles
 #endif
 #endif
 
       /* Check whether we should write a restart file */
-
       if(check_for_interruption_of_run())
         return;
     }
