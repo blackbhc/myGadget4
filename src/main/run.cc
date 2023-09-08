@@ -249,7 +249,10 @@ void sim::run(void)
 #ifdef UPDATE_CENTER
       // recenter the zero-mass static test particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
-      static double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
+      static double lastCenterOfMass[3];                // center of mass in the last step
+      for(int i = 0; i < 3; ++i)
+        lastCenterOfMass[i] = centerOfMass[i];
+      static double offset = 0.0;  // offset for the particle positions w.r.t. the center of mass
       // initialize the center of mass
       double comNumerator[3] = {0.0, 0.0, 0.0};  // local sum of positions
       double comDenominator  = 0.0;              // local sum of Mass
@@ -294,7 +297,10 @@ void sim::run(void)
         }
       // shift the zero-mass static test particles w.r.t the center of mass
       static MyIntPosType intpos[3] = {0, 0, 0};
-      Sp.pos_to_signedintpos(centerOfMass, (MySignedIntPosType *)intpos);
+      static double shift[3]        = {0.0, 0.0, 0.0};
+      for(int i = 0; i < 3; ++i)
+        shift[i] = centerOfMass[i] - lastCenterOfMass[i];
+      Sp.pos_to_signedintpos(shift, (MySignedIntPosType *)intpos);
       for(int i = 0; i < numZeroMass; ++i)
         {
           Sp.P[idZeroMass[i]].IntPos[0] += intpos[0];
