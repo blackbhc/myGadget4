@@ -1257,3 +1257,36 @@ This parameter specify the particle type that is zero mass, which
 is used to calculate the gravitational potential at the position of 
 the particles of this type. This is only used when ZERO_MASS_GRA_TEST
 is activated.
+
+-------
+
+**PotOutStep**    10
+
+This parameter specify the output steps between two Synch-point for 
+the gravitational potential of the zero-mass particles. This is only 
+used when ZERO_MASS_GRA_TEST is activated.
+
+-------
+
+**RecenterPartType**    3
+
+This parameter specify the particle type that is used to recenter the 
+position of the zero-mass static test particles. This is only used 
+when ZERO_MASS_GRA_TEST and UPDATE_CENTER are both activated. 
+
+-------
+
+**RecenterSize**    10
+
+This parameter specify the sphere radius that is used to recenter the 
+position of the zero-mass static test particles. In unit of the length
+of the simulation. This is only used when ZERO_MASS_GRA_TEST and 
+UPDATE_CENTER are both activated.
+
+-------
+
+**RecenterThreshold**    0.1
+
+This parameter specify the convergence threshold for the recentering.
+In unit of the length of the simulation. 
+This is only used when ZERO_MASS_GRA_TEST and UPDATE_CENTER are both activated.

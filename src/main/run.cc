@@ -213,6 +213,97 @@ void sim::run(void)
 
       All.NumCurrentTiStep++;
 
+      // Data collection part, which will be used in galotfa
+      // array of the particles' data
+#ifdef ZERO_MASS_GRA_TEST
+      // extract the data of the particles and store them in the arrays
+      static double pos[3] = {0, 0, 0};
+      // Data collection part, which will be used in galotfa
+      // array of the particles' data
+      double positions[Sp.NumPart][3];
+      double potentials[Sp.NumPart];
+      int numZeroMass = 0;         // number of zero-mass static test particles in local process
+      int idZeroMass[Sp.NumPart];  // id of zero-mass static test particles in local process
+
+      // TODO: output the positions and potentials of the zero-mass static test particles
+#ifdef UPDATE_CENTER
+      int numRecenter = 0;         // number of target recentering particles in local process
+      int idRecenter[Sp.NumPart];  // id of target recentering particles in local process
+#endif
+      for(int i = 0; i < Sp.NumPart; ++i)
+        {
+          if(Sp.P[i].getType() == All.ZeroMassPartType)
+            {
+              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);  // collect positions
+              positions[numZeroMass][0] = pos[0];
+              positions[numZeroMass][1] = pos[1];
+              positions[numZeroMass][2] = pos[2];
+              potentials[numZeroMass]   = Sp.P[i].Potential;
+              idZeroMass[numZeroMass++] = i;
+            }
+#ifdef UPDATE_CENTER
+          else if(Sp.P[i].getType() == All.RecenterPartType)
+            idRecenter[numRecenter++] = i;
+#endif
+        }
+#ifdef UPDATE_CENTER
+      // recenter the zero-mass static test particles to the center of mass of the system
+      static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
+      static double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
+      // initialize the center of mass
+      double comNumerator[3] = {0.0, 0.0, 0.0};  // local sum of positions
+      double comDenominator  = 0.0;              // local sum of Mass
+      // the main loop of the recentering
+      static double oldValue[3] = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
+      for(int loop = 0; loop < 25; ++loop)                                              // MAX number of iterations = 25
+        {
+          double factor = loop == 0 ? 100.0 : 1;  // the scale factor for region size: set a large region for the 1st iteration
+          memset(comNumerator, 0, 3 * sizeof(double));
+          comDenominator = 0.0;
+          oldValue[0]    = centerOfMass[0];
+          oldValue[1]    = centerOfMass[1];
+          oldValue[2]    = centerOfMass[2];
+          for(int i = 0; i < numRecenter; ++i)
+            {
+              Sp.intpos_to_pos(Sp.P[idRecenter[i]].IntPos, pos);
+              // only consider the particles within the specified radius
+              offset = sqrt((pos[0] - centerOfMass[0]) * (pos[0] - centerOfMass[0]) +
+                            (pos[1] - centerOfMass[1]) * (pos[1] - centerOfMass[1]) +
+                            (pos[2] - centerOfMass[2]) * (pos[2] - centerOfMass[2]));
+              if(offset < All.RecenterSize * factor)  // only consider the particles within the specified radius
+                {
+                  comNumerator[0] += pos[0] * Sp.P[idRecenter[i]].getMass();
+                  comNumerator[1] += pos[1] * Sp.P[idRecenter[i]].getMass();
+                  comNumerator[2] += pos[2] * Sp.P[idRecenter[i]].getMass();
+                  comDenominator += Sp.P[idRecenter[i]].getMass();
+                }
+            }
+          // MPI reduction to get the demoninator and numerator of the center of mass
+          MPI_Allreduce(MPI_IN_PLACE, comNumerator, 3, MPI_DOUBLE, MPI_SUM, Communicator);
+          MPI_Allreduce(MPI_IN_PLACE, &comDenominator, 1, MPI_DOUBLE, MPI_SUM, Communicator);
+          // update the center of mass
+          centerOfMass[0] = comNumerator[0] / comDenominator;
+          centerOfMass[1] = comNumerator[1] / comDenominator;
+          centerOfMass[2] = comNumerator[2] / comDenominator;
+          // check whether the center of mass has converged
+          if((centerOfMass[0] - oldValue[0]) * (centerOfMass[0] - oldValue[0]) +
+                 (centerOfMass[1] - oldValue[1]) * (centerOfMass[1] - oldValue[1]) +
+                 (centerOfMass[2] - oldValue[2]) * (centerOfMass[2] - oldValue[2]) <
+             All.RecenterThreshold)  // if the center of mass has converged, break the loop
+            break;
+        }
+      // shift the zero-mass static test particles w.r.t the center of mass
+      static MyIntPosType intpos[3] = {0, 0, 0};
+      Sp.pos_to_signedintpos(centerOfMass, (MySignedIntPosType *)intpos);
+      for(int i = 0; i < numZeroMass; ++i)
+        {
+          Sp.P[idZeroMass[i]].IntPos[0] += intpos[0];
+          Sp.P[idZeroMass[i]].IntPos[1] += intpos[1];
+          Sp.P[idZeroMass[i]].IntPos[2] += intpos[2];
+        }  // update the center of mass for zero-mass static test particles
+#endif
+#endif
+
       /* Check whether we should write a restart file */
       if(check_for_interruption_of_run())
         return;
@@ -704,10 +795,8 @@ void sim::create_snapshot_if_desired(void)
             mycxxsort_parallel(Lp.P, Lp.P + Lp.NumPart, Lp.compare_ipnest, Communicator);
 #endif
 
-#if !defined(LIGHTCONE_PARTICLES_SKIP_SAVING)
             for(int conenr = 0; conenr < LightCone.Nlightcones; conenr++)
               Lcone.lightcone_save(All.LightconeFileCount, conenr, false);
-#endif
 
             mpi_printf("LIGHTCONE: done with writing files.\n");
 
