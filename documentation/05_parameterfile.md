@@ -1260,6 +1260,14 @@ is activated.
 
 -------
 
+**PotOutStep**    10
+
+This parameter specify the output steps between two Synch-point for 
+the gravitational potential of the zero-mass particles. This is only 
+used when ZERO_MASS_GRA_TEST is activated.
+
+-------
+
 **RecenterPartType**    3
 
 This parameter specify the particle type that is used to recenter the 

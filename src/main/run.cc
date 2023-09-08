@@ -224,6 +224,8 @@ void sim::run(void)
       double potentials[Sp.NumPart];
       int numZeroMass = 0;         // number of zero-mass static test particles in local process
       int idZeroMass[Sp.NumPart];  // id of zero-mass static test particles in local process
+
+      // TODO: output the positions and potentials of the zero-mass static test particles
 #ifdef UPDATE_CENTER
       int numRecenter = 0;         // number of target recentering particles in local process
       int idRecenter[Sp.NumPart];  // id of target recentering particles in local process
