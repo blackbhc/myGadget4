@@ -293,7 +293,7 @@ void sim::run(void)
         }
       // shift the zero-mass static test particles w.r.t the center of mass
       static MyIntPosType intpos[3] = {0, 0, 0};
-      // Sp.pos_to_intpos(centerOfMass, intpos); //TODO: the most computationally expensive part
+      Sp.pos_to_signedintpos(centerOfMass, (MySignedIntPosType *)intpos);
       for(int i = 0; i < numZeroMass; ++i)
         {
           Sp.P[idZeroMass[i]].IntPos[0] += intpos[0];
