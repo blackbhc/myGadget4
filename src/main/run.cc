@@ -870,6 +870,7 @@ void sim::create_snapshot_if_desired(void)
 #endif
 }
 
+#ifdef ZERO_MASS_GRA_TEST
 // My functions: Bin-Hui Chen
 void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], int (&ids)[], double time,
                              int num)  // the function to write potential tracers to hdf5 file, only called by the root rank
@@ -965,3 +966,4 @@ void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], in
       globalNum = offset;
     }
 }
+#endif
