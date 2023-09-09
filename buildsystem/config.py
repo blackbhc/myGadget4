@@ -22,12 +22,21 @@ def out1(options, fname):
     
     keys = list(options.keys())
     keys.sort()
+    defined_0m_tracer = False
+    define_evalPot = False
     
     for key in keys:
+        if key == "ZERO_MASS_GRA_TEST":
+            defined_0m_tracer = True
+        elif key == "EVALPOTENTIAL":
+            define_evalPot = True
         if options[key] is None:
             f.write("#define " + key + "\n")
         else:
             f.write("#define " + key + " " + options[key] + "\n")
+
+    if defined_0m_tracer and not define_evalPot:
+        f.write("#define EVALPOTENTIAL\n")
             
 def out2(options, fname):
     f = open(fname, "w")
