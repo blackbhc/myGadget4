@@ -872,11 +872,54 @@ void sim::create_snapshot_if_desired(void)
 
 // My functions: Bin-Hui Chen
 void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], MyIDType (&ids)[], double time,
-                             int num)
+                             int num)  // the function to write potential tracers to hdf5 file, only called by the root rank
 {
-  char potFile[MAXLEN_PATH_EXTRA];
+  static int outputCount = 0;
+  bool firstTime         = outputCount == 0 ? true : false;
+  static char potFile[MAXLEN_PATH_EXTRA];
   snprintf(potFile, MAXLEN_PATH_EXTRA, "%s%s.hdf5", All.OutputDir, filename);
-  printf("Writing potential tracers to file %s.\n", potFile);
+  static hsize_t tracerNum        = (hsize_t)num;
+  static hsize_t dims_1d[1]       = {tracerNum};
+  static hsize_t maxdims_1d[1]    = {tracerNum};
+  static hsize_t chunk_dims_1d[1] = {tracerNum};
+  static hid_t dataspace_id_1d    = H5Screate_simple(1, dims_1d, maxdims_1d);
+  static hid_t prop_id_1d         = H5Pcreate(H5P_DATASET_CREATE);
+  static hsize_t dims_2d[2]       = {tracerNum, 3};
+  static hsize_t maxdims_2d[2]    = {tracerNum, 3};
+  static hsize_t chunk_dims_2d[2] = {tracerNum, 3};
+  static hid_t dataspace_id_2d    = H5Screate_simple(2, dims_2d, maxdims_2d);
+  static hid_t prop_id_2d         = H5Pcreate(H5P_DATASET_CREATE);
+  // if(firstTime)
+  //   {
+  H5Pset_chunk(prop_id_1d, 1, chunk_dims_1d);  // set chunk size
+  H5Pset_chunk(prop_id_2d, 2, chunk_dims_2d);
+  // }
+  static hid_t file_id = H5Fcreate(potFile, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);  // open the file
+  char group_name[20];                                                                 // create dataset name
+  snprintf(group_name, 20, "Output_%d", outputCount++);
+  hid_t group_id      = H5Gcreate2(file_id, group_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  hid_t dataset_coord = H5Dcreate2(group_id, "Coordinates", H5T_NATIVE_DOUBLE, dataspace_id_2d, H5P_DEFAULT, prop_id_2d, H5P_DEFAULT);
+  hid_t dataset_pot   = H5Dcreate2(group_id, "Potentials", H5T_NATIVE_DOUBLE, dataspace_id_1d, H5P_DEFAULT, prop_id_1d, H5P_DEFAULT);
+  hid_t dataset_id    = H5Dcreate2(group_id, "TracerIDs", H5T_NATIVE_INT, dataspace_id_1d, H5P_DEFAULT, prop_id_1d, H5P_DEFAULT);
+  hid_t dataSpace_coord = H5Dget_space(dataset_coord);
+  hid_t dataSpace_pot   = H5Dget_space(dataset_pot);
+  hid_t dataSpace_id    = H5Dget_space(dataset_id);
+  H5Dwrite(dataset_coord, H5T_NATIVE_DOUBLE, dataspace_id_2d, dataSpace_coord, H5P_DEFAULT, positions);  // write data
+  H5Dwrite(dataset_pot, H5T_NATIVE_DOUBLE, dataspace_id_1d, dataSpace_pot, H5P_DEFAULT, potentials);
+  H5Dwrite(dataset_id, H5T_NATIVE_INT, dataspace_id_1d, dataSpace_id, H5P_DEFAULT, ids);
+  // write attributes
+  hid_t attr_id    = H5Screate(H5S_SCALAR);
+  hid_t attr_space = H5Acreate2(group_id, "Time", H5T_NATIVE_DOUBLE, attr_id, H5P_DEFAULT, H5P_DEFAULT);
+  H5Awrite(attr_space, H5T_NATIVE_DOUBLE, &time);
+  // close attributes
+  H5Aclose(attr_space);
+  // close datasets
+  H5Dclose(dataset_coord);
+  H5Dclose(dataset_pot);
+  H5Dclose(dataset_id);
+  // close groups
+  H5Gclose(group_id);
+  // close file
 }
 
 void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], MyIDType (&localIDs)[], double (&globalPot)[],
