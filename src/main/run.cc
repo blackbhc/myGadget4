@@ -38,10 +38,6 @@
 #include "../sort/parallel_sort.h"
 #include "../system/system.h"
 
-void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], MyIDType (&ids)[], double time,
-                             int num);
-void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], MyIDType (&localIDds)[], double (&globalPot)[],
-                               double (&globalPos)[][3], MyIDType (&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size);
 /*!
  * Main driver routine for advancing the simulation forward in time.
  * The loop terminates when the cpu-time limit is reached, when a `stop' file
@@ -220,16 +216,20 @@ void sim::run(void)
       // Data collection part, which will be used in galotfa
       // array of the particles' data
 #ifdef ZERO_MASS_GRA_TEST
+      void write_potential_tracers(char(&filename)[], double(&potentials)[], double(&positions)[][3], int(&ids)[], double time,
+                                   int num);
+      void collect_potential_tracers(double(&localPot)[], double(&localPos)[][3], int(&localIDds)[], double(&globalPot)[],
+                                     double(&globalPos)[][3], int(&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size);
       // extract the data of the particles and store them in the arrays
       static double pos[3] = {0, 0, 0};
       // Data collection part, which will be used in galotfa
       // array of the particles' data
       double positions[Sp.NumPart][3];  // positions
       double potentials[Sp.NumPart];    // potentials
-      MyIDType partIDs[Sp.NumPart];     // particle IDs
+      int partIDs[Sp.NumPart];          // particle IDs
       double posGlobal[Sp.TotNumPart][3];
       double potGlobal[Sp.TotNumPart];
-      MyIDType pIDsGlobal[Sp.TotNumPart];
+      int pIDsGlobal[Sp.TotNumPart];
       // global arrays of the particles' data
       int numZeroMass    = 0;      // number of zero-mass static test particles in local process
       int numZeroMassTot = 0;      // number of zero-mass static test particles in global process
@@ -247,7 +247,7 @@ void sim::run(void)
                   positions[numZeroMass][1] = pos[1];
                   positions[numZeroMass][2] = pos[2];
                   potentials[numZeroMass]   = Sp.P[i].Potential;
-                  partIDs[numZeroMass]      = Sp.P[i].ID.get();
+                  partIDs[numZeroMass]      = (int)Sp.P[i].ID.get();
                 }
               idZeroMass[numZeroMass++] = i;
             }
@@ -870,12 +870,12 @@ void sim::create_snapshot_if_desired(void)
 #endif
 }
 
+#ifdef ZERO_MASS_GRA_TEST
 // My functions: Bin-Hui Chen
-void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], MyIDType (&ids)[], double time,
+void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], int (&ids)[], double time,
                              int num)  // the function to write potential tracers to hdf5 file, only called by the root rank
 {
   static int outputCount = 0;
-  bool firstTime         = outputCount == 0 ? true : false;
   static char potFile[MAXLEN_PATH_EXTRA];
   snprintf(potFile, MAXLEN_PATH_EXTRA, "%s%s.hdf5", All.OutputDir, filename);
   static hsize_t tracerNum        = (hsize_t)num;
@@ -922,9 +922,20 @@ void write_potential_tracers(char (&filename)[], double (&potentials)[], double 
   // close file
 }
 
-void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], MyIDType (&localIDs)[], double (&globalPot)[],
-                               double (&globalPos)[][3], MyIDType (&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size)
+void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], int (&localIDs)[], double (&globalPot)[],
+                               double (&globalPos)[][3], int (&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size)
 {
+  if(rank == 0)  // collect data from the root rank
+    {
+      globalNum = localNum;
+      for(int i = 0; i < localNum; ++i)
+        {
+          globalPot[i] = localPot[i];
+          globalIDs[i] = localIDs[i];
+          for(int j = 0; j < 3; ++j)
+            globalPos[i][j] = localPos[i][j];
+        }
+    }
   if(size > 1)  // if there are more than one MPI tasks
     {
       static int offset = 0;
@@ -952,18 +963,7 @@ void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], My
                 MPI_Send(localIDs, localNum, MPI_INT, 0, 2e5 + i, MPI_COMM_WORLD);
               }
         }
-      MPI_Bcast(&offset, 1, MPI_INT, 0, MPI_COMM_WORLD);  // TEST: may be unnecessary
       globalNum = offset;
     }
-  else  // if there is only one MPI task
-    {
-      globalNum = localNum;
-      for(int i = 0; i < localNum; ++i)
-        {
-          globalPot[i] = localPot[i];
-          globalIDs[i] = localIDs[i];
-          for(int j = 0; j < 3; ++j)
-            globalPos[i][j] = localPos[i][j];
-        }
-    }
 }
+#endif
