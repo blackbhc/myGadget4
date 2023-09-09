@@ -1651,4 +1651,5 @@ interact.
 **ZERO_MASS_GRA_TEST**
 
 Whether used zero mass static particles to calculate the gravitational 
-potential for on-the-fly analysis.
+potential for on-the-fly analysis. Note if this is used, the EVALPOTENTIAL
+option will be automatically enabled.
