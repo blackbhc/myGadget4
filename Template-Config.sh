@@ -208,4 +208,3 @@ INITIAL_CONDITIONS_CONTAIN_ENTROPY
 
 #---------------------------------------- User defined on-the-fly analysis options
 #ZERO_MASS_GRA_TEST # whether use zero mass static test particles for potential calculations
-#UPDATE_CENTER      # whether update the center of the zero-mass static test particles

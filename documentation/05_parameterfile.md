@@ -1268,11 +1268,19 @@ used when ZERO_MASS_GRA_TEST is activated.
 
 -------
 
+**PotOutFile**    10
+
+This file name of the output file for the gravitational potential of 
+the zero-mass particles. This is only used when ZERO_MASS_GRA_TEST is 
+activated.
+
+-------
+
 **RecenterPartType**    3
 
 This parameter specify the particle type that is used to recenter the 
 position of the zero-mass static test particles. This is only used 
-when ZERO_MASS_GRA_TEST and UPDATE_CENTER are both activated. 
+when ZERO_MASS_GRA_TEST is activated. 
 
 -------
 
@@ -1280,8 +1288,7 @@ when ZERO_MASS_GRA_TEST and UPDATE_CENTER are both activated.
 
 This parameter specify the sphere radius that is used to recenter the 
 position of the zero-mass static test particles. In unit of the length
-of the simulation. This is only used when ZERO_MASS_GRA_TEST and 
-UPDATE_CENTER are both activated.
+of the simulation. This is only used when ZERO_MASS_GRA_TEST is activated.
 
 -------
 
@@ -1289,4 +1296,4 @@ UPDATE_CENTER are both activated.
 
 This parameter specify the convergence threshold for the recentering.
 In unit of the length of the simulation. 
-This is only used when ZERO_MASS_GRA_TEST and UPDATE_CENTER are both activated.
+This is only used when ZERO_MASS_GRA_TEST is activated.

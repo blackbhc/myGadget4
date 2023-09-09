@@ -216,40 +216,57 @@ void sim::run(void)
       // Data collection part, which will be used in galotfa
       // array of the particles' data
 #ifdef ZERO_MASS_GRA_TEST
+      void write_potential_tracers(char(&filename)[], double(&potentials)[], double(&positions)[][3], int(&ids)[], double time,
+                                   int num);
+      void collect_potential_tracers(double(&localPot)[], double(&localPos)[][3], int(&localIDds)[], double(&globalPot)[],
+                                     double(&globalPos)[][3], int(&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size);
       // extract the data of the particles and store them in the arrays
       static double pos[3] = {0, 0, 0};
       // Data collection part, which will be used in galotfa
       // array of the particles' data
-      double positions[Sp.NumPart][3];
-      double potentials[Sp.NumPart];
-      int numZeroMass = 0;         // number of zero-mass static test particles in local process
+      double positions[Sp.NumPart][3];  // positions
+      double potentials[Sp.NumPart];    // potentials
+      int partIDs[Sp.NumPart];          // particle IDs
+      double posGlobal[Sp.TotNumPart][3];
+      double potGlobal[Sp.TotNumPart];
+      int pIDsGlobal[Sp.TotNumPart];
+      // global arrays of the particles' data
+      int numZeroMass    = 0;      // number of zero-mass static test particles in local process
+      int numZeroMassTot = 0;      // number of zero-mass static test particles in global process
       int idZeroMass[Sp.NumPart];  // id of zero-mass static test particles in local process
-
-      // TODO: output the positions and potentials of the zero-mass static test particles
-#ifdef UPDATE_CENTER
       int numRecenter = 0;         // number of target recentering particles in local process
       int idRecenter[Sp.NumPart];  // id of target recentering particles in local process
-#endif
       for(int i = 0; i < Sp.NumPart; ++i)
         {
           if(Sp.P[i].getType() == All.ZeroMassPartType)
             {
-              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);  // collect positions
-              positions[numZeroMass][0] = pos[0];
-              positions[numZeroMass][1] = pos[1];
-              positions[numZeroMass][2] = pos[2];
-              potentials[numZeroMass]   = Sp.P[i].Potential;
+              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);          // collect positions
+              if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials at the specified output steps
+                {
+                  positions[numZeroMass][0] = pos[0];
+                  positions[numZeroMass][1] = pos[1];
+                  positions[numZeroMass][2] = pos[2];
+                  potentials[numZeroMass]   = Sp.P[i].Potential;
+                  partIDs[numZeroMass]      = (int)Sp.P[i].ID.get();
+                }
               idZeroMass[numZeroMass++] = i;
             }
-#ifdef UPDATE_CENTER
           else if(Sp.P[i].getType() == All.RecenterPartType)
             idRecenter[numRecenter++] = i;
-#endif
         }
-#ifdef UPDATE_CENTER
+      // TODO: output the positions and potentials of the zero-mass static test particles
+      collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numZeroMass, numZeroMassTot,
+                                ThisTask, NTask);
+      if(All.NumCurrentTiStep % All.PotOutStep == 0)
+        if(ThisTask == 0)
+          write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numZeroMassTot);
+
       // recenter the zero-mass static test particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
-      static double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
+      static double lastCenterOfMass[3];                // center of mass in the last step
+      for(int i = 0; i < 3; ++i)
+        lastCenterOfMass[i] = centerOfMass[i];
+      static double offset = 0.0;  // offset for the particle positions w.r.t. the center of mass
       // initialize the center of mass
       double comNumerator[3] = {0.0, 0.0, 0.0};  // local sum of positions
       double comDenominator  = 0.0;              // local sum of Mass
@@ -294,14 +311,16 @@ void sim::run(void)
         }
       // shift the zero-mass static test particles w.r.t the center of mass
       static MyIntPosType intpos[3] = {0, 0, 0};
-      Sp.pos_to_signedintpos(centerOfMass, (MySignedIntPosType *)intpos);
+      static double shift[3]        = {0.0, 0.0, 0.0};
+      for(int i = 0; i < 3; ++i)
+        shift[i] = centerOfMass[i] - lastCenterOfMass[i];
+      Sp.pos_to_signedintpos(shift, (MySignedIntPosType *)intpos);
       for(int i = 0; i < numZeroMass; ++i)
         {
           Sp.P[idZeroMass[i]].IntPos[0] += intpos[0];
           Sp.P[idZeroMass[i]].IntPos[1] += intpos[1];
           Sp.P[idZeroMass[i]].IntPos[2] += intpos[2];
         }  // update the center of mass for zero-mass static test particles
-#endif
 #endif
 
       /* Check whether we should write a restart file */
@@ -850,3 +869,101 @@ void sim::create_snapshot_if_desired(void)
     }
 #endif
 }
+
+#ifdef ZERO_MASS_GRA_TEST
+// My functions: Bin-Hui Chen
+void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], int (&ids)[], double time,
+                             int num)  // the function to write potential tracers to hdf5 file, only called by the root rank
+{
+  static int outputCount = 0;
+  static char potFile[MAXLEN_PATH_EXTRA];
+  snprintf(potFile, MAXLEN_PATH_EXTRA, "%s%s.hdf5", All.OutputDir, filename);
+  static hsize_t tracerNum        = (hsize_t)num;
+  static hsize_t dims_1d[1]       = {tracerNum};
+  static hsize_t maxdims_1d[1]    = {tracerNum};
+  static hsize_t chunk_dims_1d[1] = {tracerNum};
+  static hid_t dataspace_id_1d    = H5Screate_simple(1, dims_1d, maxdims_1d);
+  static hid_t prop_id_1d         = H5Pcreate(H5P_DATASET_CREATE);
+  static hsize_t dims_2d[2]       = {tracerNum, 3};
+  static hsize_t maxdims_2d[2]    = {tracerNum, 3};
+  static hsize_t chunk_dims_2d[2] = {tracerNum, 3};
+  static hid_t dataspace_id_2d    = H5Screate_simple(2, dims_2d, maxdims_2d);
+  static hid_t prop_id_2d         = H5Pcreate(H5P_DATASET_CREATE);
+  // if(firstTime)
+  //   {
+  H5Pset_chunk(prop_id_1d, 1, chunk_dims_1d);  // set chunk size
+  H5Pset_chunk(prop_id_2d, 2, chunk_dims_2d);
+  // }
+  static hid_t file_id = H5Fcreate(potFile, H5F_ACC_TRUNC, H5P_DEFAULT, H5P_DEFAULT);  // open the file
+  char group_name[20];                                                                 // create dataset name
+  snprintf(group_name, 20, "Output_%d", outputCount++);
+  hid_t group_id      = H5Gcreate2(file_id, group_name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+  hid_t dataset_coord = H5Dcreate2(group_id, "Coordinates", H5T_NATIVE_DOUBLE, dataspace_id_2d, H5P_DEFAULT, prop_id_2d, H5P_DEFAULT);
+  hid_t dataset_pot   = H5Dcreate2(group_id, "Potentials", H5T_NATIVE_DOUBLE, dataspace_id_1d, H5P_DEFAULT, prop_id_1d, H5P_DEFAULT);
+  hid_t dataset_id    = H5Dcreate2(group_id, "TracerIDs", H5T_NATIVE_INT, dataspace_id_1d, H5P_DEFAULT, prop_id_1d, H5P_DEFAULT);
+  hid_t dataSpace_coord = H5Dget_space(dataset_coord);
+  hid_t dataSpace_pot   = H5Dget_space(dataset_pot);
+  hid_t dataSpace_id    = H5Dget_space(dataset_id);
+  H5Dwrite(dataset_coord, H5T_NATIVE_DOUBLE, dataspace_id_2d, dataSpace_coord, H5P_DEFAULT, positions);  // write data
+  H5Dwrite(dataset_pot, H5T_NATIVE_DOUBLE, dataspace_id_1d, dataSpace_pot, H5P_DEFAULT, potentials);
+  H5Dwrite(dataset_id, H5T_NATIVE_INT, dataspace_id_1d, dataSpace_id, H5P_DEFAULT, ids);
+  // write attributes
+  hid_t attr_id    = H5Screate(H5S_SCALAR);
+  hid_t attr_space = H5Acreate2(group_id, "Time", H5T_NATIVE_DOUBLE, attr_id, H5P_DEFAULT, H5P_DEFAULT);
+  H5Awrite(attr_space, H5T_NATIVE_DOUBLE, &time);
+  // close attributes
+  H5Aclose(attr_space);
+  // close datasets
+  H5Dclose(dataset_coord);
+  H5Dclose(dataset_pot);
+  H5Dclose(dataset_id);
+  // close groups
+  H5Gclose(group_id);
+  // close file
+}
+
+void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], int (&localIDs)[], double (&globalPot)[],
+                               double (&globalPos)[][3], int (&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size)
+{
+  if(rank == 0)  // collect data from the root rank
+    {
+      globalNum = localNum;
+      for(int i = 0; i < localNum; ++i)
+        {
+          globalPot[i] = localPot[i];
+          globalIDs[i] = localIDs[i];
+          for(int j = 0; j < 3; ++j)
+            globalPos[i][j] = localPos[i][j];
+        }
+    }
+  if(size > 1)  // if there are more than one MPI tasks
+    {
+      static int offset = 0;
+      if(rank == 0)
+        {
+          static int dataTransferSize = 0;
+          offset                      = localNum;
+          for(int i = 1; i < size; ++i)
+            {
+              MPI_Recv(&dataTransferSize, 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);  // receive the size of data to be sent
+              MPI_Recv(globalPot + offset, dataTransferSize, MPI_DOUBLE, i, i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+              MPI_Recv(globalPos + offset, 3 * dataTransferSize, MPI_DOUBLE, i, 1e5 + i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+              MPI_Recv(globalIDs + offset, dataTransferSize, MPI_INT, i, 2e5 + i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+              offset += dataTransferSize;
+            }
+        }
+      else
+        {
+          for(int i = 1; i < size; ++i)
+            if(rank == i)
+              {
+                MPI_Send(&localNum, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);  // send the size of data to be sent
+                MPI_Send(localPot, localNum, MPI_DOUBLE, 0, i, MPI_COMM_WORLD);
+                MPI_Send(localPos, 3 * localNum, MPI_DOUBLE, 0, 1e5 + i, MPI_COMM_WORLD);
+                MPI_Send(localIDs, localNum, MPI_INT, 0, 2e5 + i, MPI_COMM_WORLD);
+              }
+        }
+      globalNum = offset;
+    }
+}
+#endif

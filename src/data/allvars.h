@@ -40,11 +40,12 @@ struct global_data_all_processes : public parameters
 #endif
 
 #ifdef ZERO_MASS_GRA_TEST
-  int ZeroMassPartType;      // TEST: add a runtime parameter for zero mass test particles
-  int RecenterPartType;      // particle type to recenter particles
-  int PotOutStep;            // step to output potential of the zero mass static test particles
-  double RecenterSize;       // size of box to recenter particles: half of box side length
-  double RecenterThreshold;  // convergence threshold for recentering
+  int ZeroMassPartType;          // TEST: add a runtime parameter for zero mass test particles
+  int RecenterPartType;          // particle type to recenter particles
+  int PotOutStep;                // step to output potential of the zero mass static test particles
+  char PotOutFile[MAXLEN_PATH];  // file to output potential of the zero mass static test particles
+  double RecenterSize;           // size of box to recenter particles: half of box side length
+  double RecenterThreshold;      // convergence threshold for recentering
 #endif
 
   double TopNodeFactor;
