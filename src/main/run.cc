@@ -234,8 +234,8 @@ void sim::run(void)
       int numPotTracer    = 0;      // number of potential tracer  particles in local process
       int numPotTracerTot = 0;      // number of potential tracer  particles in global process
       int idPotTracer[Sp.NumPart];  // id of potential tracer  particles in local process
-      int numRecenter = 0;         // number of target recentering particles in local process
-      int idRecenter[Sp.NumPart];  // id of target recentering particles in local process
+      int numRecenter = 0;          // number of target recentering particles in local process
+      int idRecenter[Sp.NumPart];   // id of target recentering particles in local process
       for(int i = 0; i < Sp.NumPart; ++i)
         {
           if(Sp.P[i].getType() == All.PotTracerType)
@@ -256,12 +256,12 @@ void sim::run(void)
         }
       // output the positions and potentials of the potential tracer  particles if needed
       if(All.NumCurrentTiStep % All.PotOutStep == 0)
-        if(ThisTask == 0)
-          {
-            collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numPotTracer, numPotTracerTot,
-                                      ThisTask, NTask);
+        {
+          collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numPotTracer, numPotTracerTot,
+                                    ThisTask, NTask);
+          if(ThisTask == 0)
             write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
-          }
+        }
 
       // recenter the potential tracer  particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass

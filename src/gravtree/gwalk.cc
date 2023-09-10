@@ -112,7 +112,7 @@ inline void gwalk::evaluate_particle_particle_interaction(const pinfo &pdat, con
     }
 #ifdef ZERO_MASS_POT_TRACER
   if(mass == 0)
-    return;  // TEST: no need for potential calculation for potential tracer particles
+    return;  // no need for potential calculation for potential tracer particles
 #endif
 
 #ifdef PMGRID
