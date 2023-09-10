@@ -254,12 +254,14 @@ void sim::run(void)
           else if(Sp.P[i].getType() == All.RecenterPartType)
             idRecenter[numRecenter++] = i;
         }
-      // TODO: output the positions and potentials of the zero-mass static test particles
-      collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numZeroMass, numZeroMassTot,
-                                ThisTask, NTask);
+      // output the positions and potentials of the zero-mass static test particles if needed
       if(All.NumCurrentTiStep % All.PotOutStep == 0)
         if(ThisTask == 0)
-          write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numZeroMassTot);
+          {
+            collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numZeroMass, numZeroMassTot,
+                                      ThisTask, NTask);
+            write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numZeroMassTot);
+          }
 
       // recenter the zero-mass static test particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
