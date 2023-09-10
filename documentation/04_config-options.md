@@ -1648,8 +1648,8 @@ interact.
 
 -------
 
-**ZERO_MASS_GRA_TEST**
+**ZERO_MASS_POT_TRACER**
 
-Whether used zero mass static particles to calculate the gravitational 
+Whether used potential tracer static particles to calculate the gravitational 
 potential for on-the-fly analysis. Note if this is used, the EVALPOTENTIAL
 option will be automatically enabled.

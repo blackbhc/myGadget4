@@ -215,7 +215,7 @@ void sim::run(void)
 
       // Data collection part, which will be used in galotfa
       // array of the particles' data
-#ifdef ZERO_MASS_GRA_TEST
+#ifdef ZERO_MASS_POT_TRACER
       void write_potential_tracers(char(&filename)[], double(&potentials)[], double(&positions)[][3], int(&ids)[], double time,
                                    int num);
       void collect_potential_tracers(double(&localPot)[], double(&localPos)[][3], int(&localIDds)[], double(&globalPot)[],
@@ -231,39 +231,39 @@ void sim::run(void)
       double potGlobal[Sp.TotNumPart];
       int pIDsGlobal[Sp.TotNumPart];
       // global arrays of the particles' data
-      int numZeroMass    = 0;      // number of zero-mass static test particles in local process
-      int numZeroMassTot = 0;      // number of zero-mass static test particles in global process
-      int idZeroMass[Sp.NumPart];  // id of zero-mass static test particles in local process
+      int numPotTracer    = 0;      // number of potential tracer  particles in local process
+      int numPotTracerTot = 0;      // number of potential tracer  particles in global process
+      int idPotTracer[Sp.NumPart];  // id of potential tracer  particles in local process
       int numRecenter = 0;         // number of target recentering particles in local process
       int idRecenter[Sp.NumPart];  // id of target recentering particles in local process
       for(int i = 0; i < Sp.NumPart; ++i)
         {
-          if(Sp.P[i].getType() == All.ZeroMassPartType)
+          if(Sp.P[i].getType() == All.PotTracerType)
             {
               Sp.intpos_to_pos(Sp.P[i].IntPos, pos);          // collect positions
               if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials at the specified output steps
                 {
-                  positions[numZeroMass][0] = pos[0];
-                  positions[numZeroMass][1] = pos[1];
-                  positions[numZeroMass][2] = pos[2];
-                  potentials[numZeroMass]   = Sp.P[i].Potential;
-                  partIDs[numZeroMass]      = (int)Sp.P[i].ID.get();
+                  positions[numPotTracer][0] = pos[0];
+                  positions[numPotTracer][1] = pos[1];
+                  positions[numPotTracer][2] = pos[2];
+                  potentials[numPotTracer]   = Sp.P[i].Potential;
+                  partIDs[numPotTracer]      = (int)Sp.P[i].ID.get();
                 }
-              idZeroMass[numZeroMass++] = i;
+              idPotTracer[numPotTracer++] = i;
             }
           else if(Sp.P[i].getType() == All.RecenterPartType)
             idRecenter[numRecenter++] = i;
         }
-      // output the positions and potentials of the zero-mass static test particles if needed
+      // output the positions and potentials of the potential tracer  particles if needed
       if(All.NumCurrentTiStep % All.PotOutStep == 0)
         if(ThisTask == 0)
           {
-            collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numZeroMass, numZeroMassTot,
+            collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numPotTracer, numPotTracerTot,
                                       ThisTask, NTask);
-            write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numZeroMassTot);
+            write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
           }
 
-      // recenter the zero-mass static test particles to the center of mass of the system
+      // recenter the potential tracer  particles to the center of mass of the system
       static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
       static double lastCenterOfMass[3];                // center of mass in the last step
       for(int i = 0; i < 3; ++i)
@@ -311,18 +311,18 @@ void sim::run(void)
              All.RecenterThreshold)  // if the center of mass has converged, break the loop
             break;
         }
-      // shift the zero-mass static test particles w.r.t the center of mass
+      // shift the potential tracer  particles w.r.t the center of mass
       static MyIntPosType intpos[3] = {0, 0, 0};
       static double shift[3]        = {0.0, 0.0, 0.0};
       for(int i = 0; i < 3; ++i)
         shift[i] = centerOfMass[i] - lastCenterOfMass[i];
       Sp.pos_to_signedintpos(shift, (MySignedIntPosType *)intpos);
-      for(int i = 0; i < numZeroMass; ++i)
+      for(int i = 0; i < numPotTracer; ++i)
         {
-          Sp.P[idZeroMass[i]].IntPos[0] += intpos[0];
-          Sp.P[idZeroMass[i]].IntPos[1] += intpos[1];
-          Sp.P[idZeroMass[i]].IntPos[2] += intpos[2];
-        }  // update the center of mass for zero-mass static test particles
+          Sp.P[idPotTracer[i]].IntPos[0] += intpos[0];
+          Sp.P[idPotTracer[i]].IntPos[1] += intpos[1];
+          Sp.P[idPotTracer[i]].IntPos[2] += intpos[2];
+        }  // update the center of mass for potential tracer  particles
 #endif
 
       /* Check whether we should write a restart file */
@@ -872,7 +872,7 @@ void sim::create_snapshot_if_desired(void)
 #endif
 }
 
-#ifdef ZERO_MASS_GRA_TEST
+#ifdef ZERO_MASS_POT_TRACER
 // My functions: Bin-Hui Chen
 void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], int (&ids)[], double time,
                              int num)  // the function to write potential tracers to hdf5 file, only called by the root rank

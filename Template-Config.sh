@@ -207,4 +207,4 @@ INITIAL_CONDITIONS_CONTAIN_ENTROPY
 #TREE_NO_SAFETY_BOX                           # when set, this disables the geometric 'near node' protection
 
 #---------------------------------------- User defined on-the-fly analysis options
-#ZERO_MASS_GRA_TEST # whether use zero mass static test particles for potential calculations
+#ZERO_MASS_POT_TRACER # whether use potential tracer  particles for potential calculations
