@@ -228,7 +228,7 @@ void sim::run(void)
       double posGlobal[Sp.TotNumPart][3];  // global version
       double potGlobal[Sp.TotNumPart];
       int pIDsGlobal[Sp.TotNumPart];
-      static double(*initPos)[3];          // backup of the initial positions of the potential tracer particles in global process
+      static MyReal(*initPos)[3];          // backup of the initial positions of the potential tracer particles in global process
                                            // aim: avoid the numerical error of the positions correction which is multiple
                                            // summation of the position shift (a small number) in the double precision
       static int firstIDofPotTracer = -1;  // the starting ID of the potential tracer particles in global process
@@ -266,8 +266,8 @@ void sim::run(void)
 
           if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracer particles in the 1st step
             {
-              initPos = new double[Sp.TotNumPart][3];                  // release by OS when the program ends
-              memset(initPos, 0, Sp.TotNumPart * 3 * sizeof(double));  // initialize the array to 0
+              initPos = new MyReal[Sp.TotNumPart][3];                  // release by OS when the program ends
+              memset(initPos, 0, Sp.TotNumPart * 3 * sizeof(MyReal));  // initialize the array to 0
               firstIDofPotTracer = *(std::min_element(partIDs, partIDs + numPotTracer));
               MPI_Allreduce(MPI_IN_PLACE, &firstIDofPotTracer, 1, MPI_INT, MPI_MIN,
                             Communicator);  // get the first ID of the potential tracer particles in global process
@@ -330,8 +330,9 @@ void sim::run(void)
       static MyIntPosType intpos[3] = {0, 0, 0};
       for(int i = 0; i < numPotTracer; ++i)
         {
-          double pos[3] = {initPos[partIDs[i] - firstIDofPotTracer][0], initPos[partIDs[i] - firstIDofPotTracer][1],
-                           initPos[partIDs[i] - firstIDofPotTracer][2]};
+          MyReal pos[3] = {initPos[partIDs[i] - firstIDofPotTracer][0] + centerOfMass[0],
+                           initPos[partIDs[i] - firstIDofPotTracer][1] + centerOfMass[1],
+                           initPos[partIDs[i] - firstIDofPotTracer][2] + centerOfMass[2]};
           Sp.pos_to_intpos(pos, intpos);
           Sp.P[idPotTracer[i]].IntPos[0] = intpos[0];
           Sp.P[idPotTracer[i]].IntPos[1] = intpos[1];
