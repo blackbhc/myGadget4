@@ -1,7 +1,7 @@
 param.txt
 *-usedvalues
 output
-Gadget4
+Gadget4*
 *.o
 version.cc
 Config.sh

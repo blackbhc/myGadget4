@@ -26,7 +26,7 @@ def out1(options, fname):
     define_evalPot = False
     
     for key in keys:
-        if key == "ZERO_MASS_GRA_TEST":
+        if key == "ZERO_MASS_POT_TRACER":
             defined_0m_tracer = True
         elif key == "EVALPOTENTIAL":
             define_evalPot = True

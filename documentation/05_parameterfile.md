@@ -1251,11 +1251,11 @@ halos that is added as a static potential to the force computation.
 
 -------
 
-**ZeroMassPartType**    3
+**PotTracerType**    3
 
-This parameter specify the particle type that is zero mass, which 
+This parameter specify the particle type that is potential tracer, which 
 is used to calculate the gravitational potential at the position of 
-the particles of this type. This is only used when ZERO_MASS_GRA_TEST
+the particles of this type. This is only used when ZERO_MASS_POT_TRACER
 is activated.
 
 -------
@@ -1263,15 +1263,15 @@ is activated.
 **PotOutStep**    10
 
 This parameter specify the output steps between two Synch-point for 
-the gravitational potential of the zero-mass particles. This is only 
-used when ZERO_MASS_GRA_TEST is activated.
+the gravitational potential of the potential tracer particles. This is only 
+used when ZERO_MASS_POT_TRACER is activated.
 
 -------
 
 **PotOutFile**    10
 
 This file name of the output file for the gravitational potential of 
-the zero-mass particles. This is only used when ZERO_MASS_GRA_TEST is 
+the potential tracer particles. This is only used when ZERO_MASS_POT_TRACER is 
 activated.
 
 -------
@@ -1279,16 +1279,16 @@ activated.
 **RecenterPartType**    3
 
 This parameter specify the particle type that is used to recenter the 
-position of the zero-mass static test particles. This is only used 
-when ZERO_MASS_GRA_TEST is activated. 
+position of the potential tracer  particles. This is only used 
+when ZERO_MASS_POT_TRACER is activated. 
 
 -------
 
 **RecenterSize**    10
 
 This parameter specify the sphere radius that is used to recenter the 
-position of the zero-mass static test particles. In unit of the length
-of the simulation. This is only used when ZERO_MASS_GRA_TEST is activated.
+position of the potential tracer  particles. In unit of the length
+of the simulation. This is only used when ZERO_MASS_POT_TRACER is activated.
 
 -------
 
@@ -1296,4 +1296,4 @@ of the simulation. This is only used when ZERO_MASS_GRA_TEST is activated.
 
 This parameter specify the convergence threshold for the recentering.
 In unit of the length of the simulation. 
-This is only used when ZERO_MASS_GRA_TEST is activated.
+This is only used when ZERO_MASS_POT_TRACER is activated.
