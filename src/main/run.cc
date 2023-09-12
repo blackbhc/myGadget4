@@ -333,7 +333,6 @@ void sim::run(void)
           MyReal pos[3] = {initPos[partIDs[i] - firstIDofPotTracer][0] + centerOfMass[0],
                            initPos[partIDs[i] - firstIDofPotTracer][1] + centerOfMass[1],
                            initPos[partIDs[i] - firstIDofPotTracer][2] + centerOfMass[2]};
-          // Sp.pos_to_intpos_no_constrain(pos, intpos);
           Sp.pos_to_intpos(pos, intpos);
           Sp.P[idPotTracer[i]].IntPos[0] = intpos[0];
           Sp.P[idPotTracer[i]].IntPos[1] = intpos[1];
