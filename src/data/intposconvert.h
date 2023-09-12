@@ -477,6 +477,17 @@ class intposconvert
 #endif
 #endif
   }
+
+#ifdef ZERO_MASS_POT_TRACER
+  template <typename T>
+  inline void pos_to_intpos_no_constrain(T *posdiff,
+                                         MyIntPosType *intpos)  // defined the same as pos_to_intpos, but without
+                                                                // constrain_pos, for faster execution for recenter the tracers
+  {
+    for(int j = 0; j < 3; j++)
+      intpos[j] = (posdiff[j] - RegionCorner[j]) * FacCoordToInt;
+  }
+#endif
 };
 
 #endif
