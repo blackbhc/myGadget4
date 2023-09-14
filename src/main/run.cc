@@ -54,9 +54,10 @@ void sim::run(void)
   void write_potential_tracers(char(&filename)[], double(&potentials)[], double(&positions)[][3], int(&ids)[], double time, int num);
   void collect_potential_tracers(double(&localPot)[], double(&localPos)[][3], int(&localIDds)[], double(&globalPot)[],
                                  double(&globalPos)[][3], int(&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size);
-  static MyReal(*initPos)[3];  // backup of the initial positions of the potential tracer particles in global process
-                               // aim: avoid the numerical error of the positions correction which is multiple
-                               // summation of the position shift (a small number) in the double precision
+  static MyReal(*initPos)[3];          // backup of the initial positions of the potential tracer particles in global process
+                                       // aim: avoid the numerical error of the positions correction which is multiple
+                                       // summation of the position shift (a small number) in the double precision
+  static int firstIDofPotTracer = -1;  // the starting ID of the potential tracer particles in global process
 #endif
 #if defined(NGENIC_TEST) && defined(PERIODIC) && defined(PMGRID)
   snap_io Snap(&Sp, Communicator, All.SnapFormat);             /* get an I/O object */
@@ -232,7 +233,6 @@ void sim::run(void)
       double posGlobal[Sp.TotNumPart][3];  // global version
       double potGlobal[Sp.TotNumPart];
       int pIDsGlobal[Sp.TotNumPart];
-      static int firstIDofPotTracer = -1;  // the starting ID of the potential tracer particles in global process
       // global arrays of the particles' data
       int numPotTracer    = 0;      // number of potential tracer particles in local process
       int numPotTracerTot = 0;      // number of potential tracer particles in global process
@@ -361,7 +361,6 @@ void sim::run(void)
   double posGlobal[Sp.TotNumPart][3];  // global version
   double potGlobal[Sp.TotNumPart];
   int pIDsGlobal[Sp.TotNumPart];
-  int firstIDofPotTracer = -1;  // the starting ID of the potential tracer particles in global process
   // global arrays of the particles' data
   int numPotTracer    = 0;      // number of potential tracer particles in local process
   int numPotTracerTot = 0;      // number of potential tracer particles in global process
@@ -412,14 +411,14 @@ void sim::run(void)
     }
 
   // recenter the potential tracer particles to the center of mass of the system
-  static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
-  static double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
+  double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
+  double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
   // initialize the center of mass
   double comNumerator[3] = {0.0, 0.0, 0.0};  // local sum of positions
   double comDenominator  = 0.0;              // local sum of Mass
   // the main loop of the recentering
-  static double oldValue[3] = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
-  for(int loop = 0; loop < 25; ++loop)                                              // MAX number of iterations = 25
+  double oldValue[3] = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
+  for(int loop = 0; loop < 25; ++loop)                                       // MAX number of iterations = 25
     {
       double factor = loop == 0 ? 100.0 : 1;  // the scale factor for region size: set a large region for the 1st iteration
       memset(comNumerator, 0, 3 * sizeof(double));
