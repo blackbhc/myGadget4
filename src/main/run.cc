@@ -55,10 +55,27 @@ void sim::run(void)
                                int &num);  // the function to write potential tracers to hdf5 file, only called by the root rank
   void collect_potential_tracers(double localPot[], double localPos[][3], int localIDs[], double globalPot[], double globalPos[][3],
                                  int globalIDs[], int &localNum, int &globalNum, int &rank, int &size);
-  static MyReal(*initPos)[3];          // backup of the initial positions of the potential tracer particles in global process
-                                       // aim: avoid the numerical error of the positions correction which is multiple
-                                       // summation of the position shift (a small number) in the double precision
-  static int firstIDofPotTracer = -1;  // the starting ID of the potential tracer particles in global process
+  MyReal(*initPos)[3];                     // backup of the initial positions of the potential tracer particles in global process
+                                           // aim: avoid the numerical error of the positions correction which is multiple
+                                           // summation of the position shift (a small number) in the double precision
+  initPos = new MyReal[Sp.TotNumPart][3];  // copy of the init positions of the potential tracers, release by OS when the program ends
+  int firstIDofPotTracer = -1;             // the starting ID of the potential tracer particles in global process
+  // global arrays of the particles' data
+  double(*posGlobal)[3];
+  double *potGlobal;
+  int *pIDsGlobal;
+  if(ThisTask == 0)
+    {
+      posGlobal  = new double[Sp.TotNumPart][3];  // release by OS when the program ends
+      potGlobal  = new double[Sp.TotNumPart];
+      pIDsGlobal = new int[Sp.TotNumPart];
+    }
+  else
+    {
+      posGlobal  = nullptr;
+      potGlobal  = nullptr;
+      pIDsGlobal = nullptr;
+    }
 #endif
 #if defined(NGENIC_TEST) && defined(PERIODIC) && defined(PMGRID)
   snap_io Snap(&Sp, Communicator, All.SnapFormat);             /* get an I/O object */
@@ -228,25 +245,21 @@ void sim::run(void)
       static double pos[3] = {0, 0, 0};
       // Data collection part, which will be used in galotfa
       // array of the particles' data
-      double positions[Sp.NumPart][3];     // positions of the potential tracer particles in local process
-      double potentials[Sp.NumPart];       // potentials of the potential tracer particles in local process
-      int partIDs[Sp.NumPart];             // particle IDs of the potential tracer particles in local process
-      double posGlobal[Sp.TotNumPart][3];  // global version
-      double potGlobal[Sp.TotNumPart];
-      int pIDsGlobal[Sp.TotNumPart];
-      // global arrays of the particles' data
-      int numPotTracer    = 0;      // number of potential tracer particles in local process
-      int numPotTracerTot = 0;      // number of potential tracer particles in global process
-      int idPotTracer[Sp.NumPart];  // id of potential tracer particles in local process
-      int numRecenter = 0;          // number of target recentering particles in local process
-      int idRecenter[Sp.NumPart];   // id of target recentering particles in local process
+      double positions[Sp.NumPart][3];  // positions of the potential tracer particles in local process
+      double potentials[Sp.NumPart];    // potentials of the potential tracer particles in local process
+      int partIDs[Sp.NumPart];          // particle IDs of the potential tracer particles in local process
+      int idPotTracer[Sp.NumPart];      // id of potential tracer particles in local process
+      int numRecenter     = 0;          // number of target recentering particles in local process
+      int numPotTracer    = 0;          // number of potential tracer particles in local process
+      int numPotTracerTot = 0;          // number of potential tracer particles in global process
+      int idRecenter[Sp.NumPart];       // id of target recentering particles in local process
       for(int i = 0; i < Sp.NumPart; ++i)
         {
           if(Sp.P[i].getType() == All.PotTracerType)
             {
-              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);          // collect positions
               if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials at the specified output steps
                 {
+                  Sp.intpos_to_pos(Sp.P[i].IntPos, pos);  // collect positions
                   positions[numPotTracer][0] = pos[0];
                   positions[numPotTracer][1] = pos[1];
                   positions[numPotTracer][2] = pos[2];
@@ -268,7 +281,6 @@ void sim::run(void)
 
           if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracer particles in the 1st step
             {
-              initPos = new MyReal[Sp.TotNumPart][3];                  // release by OS when the program ends
               memset(initPos, 0, Sp.TotNumPart * 3 * sizeof(MyReal));  // initialize the array to 0
               firstIDofPotTracer = *(std::min_element(partIDs, partIDs + numPotTracer));
               MPI_Allreduce(MPI_IN_PLACE, &firstIDofPotTracer, 1, MPI_INT, MPI_MIN,
@@ -349,19 +361,13 @@ void sim::run(void)
         return;
     }
 #ifdef ZERO_MASS_POT_TRACER
-  void write_potential_tracers(char(&filename)[], double(&potentials)[], double(&positions)[][3], int(&ids)[], double time, int num);
-  void collect_potential_tracers(double(&localPot)[], double(&localPos)[][3], int(&localIDds)[], double(&globalPot)[],
-                                 double(&globalPos)[][3], int(&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size);
   // extract the data of the particles and store them in the arrays
   double pos[3] = {0, 0, 0};
   // Data collection part, which will be used in galotfa
   // array of the particles' data
-  double positions[Sp.NumPart][3];     // positions of the potential tracer particles in local process
-  double potentials[Sp.NumPart];       // potentials of the potential tracer particles in local process
-  int partIDs[Sp.NumPart];             // particle IDs of the potential tracer particles in local process
-  double posGlobal[Sp.TotNumPart][3];  // global version
-  double potGlobal[Sp.TotNumPart];
-  int pIDsGlobal[Sp.TotNumPart];
+  double positions[Sp.NumPart][3];  // positions of the potential tracer particles in local process
+  double potentials[Sp.NumPart];    // potentials of the potential tracer particles in local process
+  int partIDs[Sp.NumPart];          // particle IDs of the potential tracer particles in local process
   // global arrays of the particles' data
   int numPotTracer    = 0;      // number of potential tracer particles in local process
   int numPotTracerTot = 0;      // number of potential tracer particles in global process
@@ -1015,12 +1021,12 @@ void sim::create_snapshot_if_desired(void)
 #ifdef ZERO_MASS_POT_TRACER
 // My functions: Bin-Hui Chen
 void write_potential_tracers(char filename[], double potentials[], double positions[][3], int ids[], double &time,
-                             int &num)  // the function to write potential tracers to hdf5 file, only called by the root rank
+                             int &partNum)  // the function to write potential tracers to hdf5 file, only called by the root rank
 {
   static int outputCount = 0;
   static char potFile[MAXLEN_PATH_EXTRA];
   snprintf(potFile, MAXLEN_PATH_EXTRA, "%s%s.hdf5", All.OutputDir, filename);
-  static hsize_t tracerNum        = (hsize_t)num;
+  static hsize_t tracerNum        = (hsize_t)partNum;
   static hsize_t dims_1d[1]       = {tracerNum};
   static hsize_t maxdims_1d[1]    = {tracerNum};
   static hsize_t chunk_dims_1d[1] = {tracerNum};
@@ -1080,11 +1086,10 @@ void collect_potential_tracers(double localPot[], double localPos[][3], int loca
     }
   if(size > 1)  // if there are more than one MPI tasks
     {
-      static int offset = 0;
       if(rank == 0)
         {
+          static int offset           = localNum;
           static int dataTransferSize = 0;
-          offset                      = localNum;
           for(int i = 1; i < size; ++i)
             {
               MPI_Recv(&dataTransferSize, 1, MPI_INT, i, 0, MPI_COMM_WORLD,
@@ -1094,6 +1099,7 @@ void collect_potential_tracers(double localPot[], double localPos[][3], int loca
               MPI_Recv(globalIDs + offset, dataTransferSize, MPI_INT, i, 2e5 + i, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
               offset += dataTransferSize;
             }
+          globalNum = offset;
         }
       else
         {
@@ -1106,7 +1112,6 @@ void collect_potential_tracers(double localPot[], double localPos[][3], int loca
                 MPI_Send(localIDs, localNum, MPI_INT, 0, 2e5 + i, MPI_COMM_WORLD);
               }
         }
-      globalNum = offset;
     }
 }
 #endif
