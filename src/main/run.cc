@@ -51,9 +51,10 @@
 void sim::run(void)
 {
 #ifdef ZERO_MASS_POT_TRACER
-  void write_potential_tracers(char(&filename)[], double(&potentials)[], double(&positions)[][3], int(&ids)[], double time, int num);
-  void collect_potential_tracers(double(&localPot)[], double(&localPos)[][3], int(&localIDds)[], double(&globalPot)[],
-                                 double(&globalPos)[][3], int(&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size);
+  void write_potential_tracers(char filename[], double potentials[], double positions[][3], int ids[], double &time,
+                               int &num);  // the function to write potential tracers to hdf5 file, only called by the root rank
+  void collect_potential_tracers(double localPot[], double localPos[][3], int localIDs[], double globalPot[], double globalPos[][3],
+                                 int globalIDs[], int &localNum, int &globalNum, int &rank, int &size);
   static MyReal(*initPos)[3];          // backup of the initial positions of the potential tracer particles in global process
                                        // aim: avoid the numerical error of the positions correction which is multiple
                                        // summation of the position shift (a small number) in the double precision
@@ -1013,8 +1014,8 @@ void sim::create_snapshot_if_desired(void)
 
 #ifdef ZERO_MASS_POT_TRACER
 // My functions: Bin-Hui Chen
-void write_potential_tracers(char (&filename)[], double (&potentials)[], double (&positions)[][3], int (&ids)[], double time,
-                             int num)  // the function to write potential tracers to hdf5 file, only called by the root rank
+void write_potential_tracers(char filename[], double potentials[], double positions[][3], int ids[], double &time,
+                             int &num)  // the function to write potential tracers to hdf5 file, only called by the root rank
 {
   static int outputCount = 0;
   static char potFile[MAXLEN_PATH_EXTRA];
@@ -1063,8 +1064,8 @@ void write_potential_tracers(char (&filename)[], double (&potentials)[], double 
   // close file
 }
 
-void collect_potential_tracers(double (&localPot)[], double (&localPos)[][3], int (&localIDs)[], double (&globalPot)[],
-                               double (&globalPos)[][3], int (&globalIDs)[], int &localNum, int &globalNum, int &rank, int &size)
+void collect_potential_tracers(double localPot[], double localPos[][3], int localIDs[], double globalPot[], double globalPos[][3],
+                               int globalIDs[], int &localNum, int &globalNum, int &rank, int &size)
 {
   if(rank == 0)  // collect data from the root rank
     {
