@@ -282,8 +282,8 @@ void sim::run(void)
         {
           collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numPotTracer, numPotTracerTot,
                                     ThisTask, NTask);  // collect the data of the potential tracers in all processes
-          // if(ThisTask == 0)                            // only the root rank writes the data to the file
-          //   write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
+          if(ThisTask == 0)                            // only the root rank writes the data to the file
+            write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
 
           if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracers at the beginning of the simulation
             {
@@ -400,8 +400,8 @@ void sim::run(void)
     {
       collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numPotTracer, numPotTracerTot,
                                 ThisTask, NTask);  // collect the data of the potential tracers in all processes
-      // if(ThisTask == 0)                            // only the root rank writes the data to the file
-      //   write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
+      if(ThisTask == 0)                            // only the root rank writes the data to the file
+        write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
 
       if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracers at the beginning of the simulation
         {
