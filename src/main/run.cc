@@ -50,6 +50,7 @@
  */
 void sim::run(void)
 {
+  // call the galotfa api
 #ifdef ZERO_MASS_POT_TRACER
   void write_potential_tracers(char filename[], double potentials[], double positions[][3], int ids[], double &time,
                                int &num);  // the function to write potential tracers to hdf5 file, only called by the root rank
@@ -59,7 +60,7 @@ void sim::run(void)
                                            // aim: avoid the numerical error of the positions correction which is multiple
                                            // summation of the position shift (a small number) in the double precision
   initPos = new MyReal[Sp.TotNumPart][3];  // copy of the init positions of the potential tracers, release by OS when the program ends
-  int firstIDofPotTracer = -1;             // the starting ID of the potential tracer particles in global process
+  int firstIDofPotTracer = INT_MAX;        // the starting ID of the potential tracer particles in global process
   // global arrays of the particles' data
   double(*posGlobal)[3];
   double *potGlobal;
@@ -76,7 +77,17 @@ void sim::run(void)
       potGlobal  = nullptr;
       pIDsGlobal = nullptr;
     }
+  // arrays used to recenter the potential tracer particles to the center of mass of the system
+  double pos[3]          = {0, 0, 0};        // a temporary array used for coordinate transformation
+  MyIntPosType intpos[3] = {0, 0, 0};        // unsigned integer positions
+  double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
+  double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
+  // initialize the center of mass
+  double comNumerator[3] = {0.0, 0.0, 0.0};                                      // local sum of positions
+  double comDenominator  = 0.0;                                                  // local sum of Mass
+  double oldValue[3]     = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
 #endif
+
 #if defined(NGENIC_TEST) && defined(PERIODIC) && defined(PMGRID)
   snap_io Snap(&Sp, Communicator, All.SnapFormat);             /* get an I/O object */
   Snap.write_snapshot(All.SnapshotFileCount, NORMAL_SNAPSHOT); /* write snapshot file */
@@ -238,51 +249,51 @@ void sim::run(void)
         }
 #endif
 
-        // Data collection part, which will be used in galotfa
-        // array of the particles' data
-#ifdef ZERO_MASS_POT_TRACER
-      // extract the data of the particles and store them in the arrays
-      static double pos[3] = {0, 0, 0};
-      // Data collection part, which will be used in galotfa
-      // array of the particles' data
-      double positions[Sp.NumPart][3];  // positions of the potential tracer particles in local process
-      double potentials[Sp.NumPart];    // potentials of the potential tracer particles in local process
-      int partIDs[Sp.NumPart];          // particle IDs of the potential tracer particles in local process
-      int idPotTracer[Sp.NumPart];      // id of potential tracer particles in local process
-      int numRecenter     = 0;          // number of target recentering particles in local process
-      int numPotTracer    = 0;          // number of potential tracer particles in local process
-      int numPotTracerTot = 0;          // number of potential tracer particles in global process
-      int idRecenter[Sp.NumPart];       // id of target recentering particles in local process
-      for(int i = 0; i < Sp.NumPart; ++i)
+#ifdef ZERO_MASS_POT_TRACER  // the potential tracer part
+      // array of the particles' data in local process
+      double positions[Sp.NumPart][3];     // positions of tracers
+      double potentials[Sp.NumPart];       // potentials of the tracers
+      int partIDs[Sp.NumPart];             // particle IDs of the tracers
+      int idPotTracer[Sp.NumPart];         // id of tracers in the local array
+      int numRecenter     = 0;             // number of recentering anchor particles in local process
+      int numPotTracer    = 0;             // number of tracers in local process
+      int numPotTracerTot = 0;             // number of tracers in global process
+      int idRecenter[Sp.NumPart];          // id of recentering anchors in the local array
+      for(int i = 0; i < Sp.NumPart; ++i)  // collect the data of the potential tracers
         {
           if(Sp.P[i].getType() == All.PotTracerType)
             {
-              if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials at the specified output steps
+              if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials only at the specified output steps
                 {
                   Sp.intpos_to_pos(Sp.P[i].IntPos, pos);  // collect positions
                   positions[numPotTracer][0] = pos[0];
                   positions[numPotTracer][1] = pos[1];
                   positions[numPotTracer][2] = pos[2];
                   potentials[numPotTracer]   = Sp.P[i].Potential;
-                  partIDs[numPotTracer]      = (int)Sp.P[i].ID.get();
                 }
-              idPotTracer[numPotTracer++] = i;
+              partIDs[numPotTracer]       = (int)Sp.P[i].ID.get();  // collect particle IDs in local process
+              idPotTracer[numPotTracer++] = i;                      // get the number and id of the potential tracers
             }
           else if(Sp.P[i].getType() == All.RecenterPartType)
-            idRecenter[numRecenter++] = i;
+            idRecenter[numRecenter++] = i;  // get the number and id of the recentering anchors
         }
-      // output the positions and potentials of the potential tracer particles if needed
       if(All.NumCurrentTiStep % All.PotOutStep == 0)
+        // output the positions and potentials of the potential tracers at specified output steps
         {
           collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numPotTracer, numPotTracerTot,
-                                    ThisTask, NTask);
-          if(ThisTask == 0)
-            write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
+                                    ThisTask, NTask);  // collect the data of the potential tracers in all processes
+          // if(ThisTask == 0)                            // only the root rank writes the data to the file
+          //   write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
 
-          if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracer particles in the 1st step
+          if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracers at the beginning of the simulation
             {
               memset(initPos, 0, Sp.TotNumPart * 3 * sizeof(MyReal));  // initialize the array to 0
-              firstIDofPotTracer = *(std::min_element(partIDs, partIDs + numPotTracer));
+              if(numPotTracer > 0)
+                // only calculate the minimum if there are potential tracers, to avoid garbage value
+                firstIDofPotTracer = *(std::min_element(partIDs, partIDs + numPotTracer));
+              else
+                firstIDofPotTracer = INT_MAX;  // set the first ID to a large value if there is no potential tracer, so that the
+                                               // following MPI_Allreduce will not change the value
               MPI_Allreduce(MPI_IN_PLACE, &firstIDofPotTracer, 1, MPI_INT, MPI_MIN,
                             Communicator);  // get the first ID of the potential tracer particles in global process
               for(int i = 0; i < numPotTracer; ++i)
@@ -295,23 +306,18 @@ void sim::run(void)
             }
         }
 
-      // recenter the potential tracer particles to the center of mass of the system
-      static double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
-      static double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
-      // initialize the center of mass
-      double comNumerator[3] = {0.0, 0.0, 0.0};  // local sum of positions
-      double comDenominator  = 0.0;              // local sum of Mass
       // the main loop of the recentering
-      static double oldValue[3] = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
-      for(int loop = 0; loop < 25; ++loop)                                              // MAX number of iterations = 25
+      for(int loop = 0; loop < 25; ++loop)  // MAX number of iterations = 25
         {
-          double factor = loop == 0 ? 100.0 : 1;  // the scale factor for region size: set a large region for the 1st iteration
+          double factor =
+              All.NumCurrentTiStep == 0 ? 100.0 : 1;  // the scale factor for region size: set a large region for the 1st iteration
           memset(comNumerator, 0, 3 * sizeof(double));
           comDenominator = 0.0;
-          oldValue[0]    = centerOfMass[0];
-          oldValue[1]    = centerOfMass[1];
-          oldValue[2]    = centerOfMass[2];
-          for(int i = 0; i < numRecenter; ++i)
+          // backup the old value
+          oldValue[0] = centerOfMass[0];
+          oldValue[1] = centerOfMass[1];
+          oldValue[2] = centerOfMass[2];
+          for(int i = 0; i < numRecenter; ++i)  // calculate the center of mass: denominator and numerator in local process
             {
               Sp.intpos_to_pos(Sp.P[idRecenter[i]].IntPos, pos);
               // only consider the particles within the specified radius
@@ -341,7 +347,6 @@ void sim::run(void)
             break;
         }
       // shift the potential tracer particles w.r.t the center of mass
-      static MyIntPosType intpos[3] = {0, 0, 0};
       for(int i = 0; i < numPotTracer; ++i)
         {
           MyReal pos[3] = {initPos[partIDs[i] - firstIDofPotTracer][0] + centerOfMass[0],
@@ -357,54 +362,56 @@ void sim::run(void)
       All.NumCurrentTiStep++;
 
       /* Check whether we should write a restart file */
+
       if(check_for_interruption_of_run())
         return;
     }
-#ifdef ZERO_MASS_POT_TRACER
-  // extract the data of the particles and store them in the arrays
-  double pos[3] = {0, 0, 0};
-  // Data collection part, which will be used in galotfa
-  // array of the particles' data
-  double positions[Sp.NumPart][3];  // positions of the potential tracer particles in local process
-  double potentials[Sp.NumPart];    // potentials of the potential tracer particles in local process
-  int partIDs[Sp.NumPart];          // particle IDs of the potential tracer particles in local process
-  // global arrays of the particles' data
-  int numPotTracer    = 0;      // number of potential tracer particles in local process
-  int numPotTracerTot = 0;      // number of potential tracer particles in global process
-  int idPotTracer[Sp.NumPart];  // id of potential tracer particles in local process
-  int numRecenter = 0;          // number of target recentering particles in local process
-  int idRecenter[Sp.NumPart];   // id of target recentering particles in local process
-  for(int i = 0; i < Sp.NumPart; ++i)
+
+#ifdef ZERO_MASS_POT_TRACER  // the potential tracer part
+  // array of the particles' data in local process
+  double positions[Sp.NumPart][3];     // positions of tracers
+  double potentials[Sp.NumPart];       // potentials of the tracers
+  int partIDs[Sp.NumPart];             // particle IDs of the tracers
+  int idPotTracer[Sp.NumPart];         // id of tracers in the local array
+  int numRecenter     = 0;             // number of recentering anchor particles in local process
+  int numPotTracer    = 0;             // number of tracers in local process
+  int numPotTracerTot = 0;             // number of tracers in global process
+  int idRecenter[Sp.NumPart];          // id of recentering anchors in the local array
+  for(int i = 0; i < Sp.NumPart; ++i)  // collect the data of the potential tracers
     {
       if(Sp.P[i].getType() == All.PotTracerType)
         {
-          Sp.intpos_to_pos(Sp.P[i].IntPos, pos);          // collect positions
-          if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials at the specified output steps
+          if(All.NumCurrentTiStep % All.PotOutStep == 0)  // collect potentials only at the specified output steps
             {
+              Sp.intpos_to_pos(Sp.P[i].IntPos, pos);  // collect positions
               positions[numPotTracer][0] = pos[0];
               positions[numPotTracer][1] = pos[1];
               positions[numPotTracer][2] = pos[2];
               potentials[numPotTracer]   = Sp.P[i].Potential;
-              partIDs[numPotTracer]      = (int)Sp.P[i].ID.get();
             }
-          idPotTracer[numPotTracer++] = i;
+          partIDs[numPotTracer]       = (int)Sp.P[i].ID.get();  // collect particle IDs in local process
+          idPotTracer[numPotTracer++] = i;                      // get the number and id of the potential tracers
         }
       else if(Sp.P[i].getType() == All.RecenterPartType)
-        idRecenter[numRecenter++] = i;
+        idRecenter[numRecenter++] = i;  // get the number and id of the recentering anchors
     }
-  // output the positions and potentials of the potential tracer particles if needed
   if(All.NumCurrentTiStep % All.PotOutStep == 0)
+    // output the positions and potentials of the potential tracers at specified output steps
     {
       collect_potential_tracers(potentials, positions, partIDs, potGlobal, posGlobal, pIDsGlobal, numPotTracer, numPotTracerTot,
-                                ThisTask, NTask);
-      if(ThisTask == 0)
-        write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
+                                ThisTask, NTask);  // collect the data of the potential tracers in all processes
+      // if(ThisTask == 0)                            // only the root rank writes the data to the file
+      //   write_potential_tracers(All.PotOutFile, potGlobal, posGlobal, pIDsGlobal, All.Time, numPotTracerTot);
 
-      if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracer particles in the 1st step
+      if(All.NumCurrentTiStep == 0)  // backup the position of the potential tracers at the beginning of the simulation
         {
-          initPos = new MyReal[Sp.TotNumPart][3];                  // release by OS when the program ends
           memset(initPos, 0, Sp.TotNumPart * 3 * sizeof(MyReal));  // initialize the array to 0
-          firstIDofPotTracer = *(std::min_element(partIDs, partIDs + numPotTracer));
+          if(numPotTracer > 0)
+            // only calculate the minimum if there are potential tracers, to avoid garbage value
+            firstIDofPotTracer = *(std::min_element(partIDs, partIDs + numPotTracer));
+          else
+            firstIDofPotTracer = INT_MAX;  // set the first ID to a large value if there is no potential tracer, so that the
+                                           // following MPI_Allreduce will not change the value
           MPI_Allreduce(MPI_IN_PLACE, &firstIDofPotTracer, 1, MPI_INT, MPI_MIN,
                         Communicator);  // get the first ID of the potential tracer particles in global process
           for(int i = 0; i < numPotTracer; ++i)
@@ -417,23 +424,18 @@ void sim::run(void)
         }
     }
 
-  // recenter the potential tracer particles to the center of mass of the system
-  double centerOfMass[3] = {0.0, 0.0, 0.0};  // center of mass
-  double offset          = 0.0;              // offset for the particle positions w.r.t. the center of mass
-  // initialize the center of mass
-  double comNumerator[3] = {0.0, 0.0, 0.0};  // local sum of positions
-  double comDenominator  = 0.0;              // local sum of Mass
   // the main loop of the recentering
-  double oldValue[3] = {centerOfMass[0], centerOfMass[1], centerOfMass[2]};  // old center of mass
-  for(int loop = 0; loop < 25; ++loop)                                       // MAX number of iterations = 25
+  for(int loop = 0; loop < 25; ++loop)  // MAX number of iterations = 25
     {
-      double factor = loop == 0 ? 100.0 : 1;  // the scale factor for region size: set a large region for the 1st iteration
+      double factor =
+          All.NumCurrentTiStep == 0 ? 100.0 : 1;  // the scale factor for region size: set a large region for the 1st iteration
       memset(comNumerator, 0, 3 * sizeof(double));
       comDenominator = 0.0;
-      oldValue[0]    = centerOfMass[0];
-      oldValue[1]    = centerOfMass[1];
-      oldValue[2]    = centerOfMass[2];
-      for(int i = 0; i < numRecenter; ++i)
+      // backup the old value
+      oldValue[0] = centerOfMass[0];
+      oldValue[1] = centerOfMass[1];
+      oldValue[2] = centerOfMass[2];
+      for(int i = 0; i < numRecenter; ++i)  // calculate the center of mass: denominator and numerator in local process
         {
           Sp.intpos_to_pos(Sp.P[idRecenter[i]].IntPos, pos);
           // only consider the particles within the specified radius
@@ -463,7 +465,6 @@ void sim::run(void)
         break;
     }
   // shift the potential tracer particles w.r.t the center of mass
-  static MyIntPosType intpos[3] = {0, 0, 0};
   for(int i = 0; i < numPotTracer; ++i)
     {
       MyReal pos[3] = {initPos[partIDs[i] - firstIDofPotTracer][0] + centerOfMass[0],
@@ -1088,7 +1089,8 @@ void collect_potential_tracers(double localPot[], double localPos[][3], int loca
     {
       if(rank == 0)
         {
-          static int offset           = localNum;
+          static int offset;  // the integer used to record the offset of the data to be sent
+          offset                      = localNum;
           static int dataTransferSize = 0;
           for(int i = 1; i < size; ++i)
             {
